@@ -1,4 +1,4 @@
-# Yugens Terrain Authoring Toolkit
+# Yūgen's Terrain Authoring Toolkit
 The public version of the Marching Squares Terrain plugin for godot.
 
 This project is an effort to create a simple to use and powerfull terrain authoring tool inside godot aimed at 3d pixel art games. However, the plugin featured in this project can be used for a wide variety of games and experimentation is encouraged! As of right now the plugin has the following features:
