@@ -237,10 +237,30 @@ void calculate_blend_weights(vec4 vc0, vec4 vc1, float sharpness, out float weig
 	}
 }
 
+// Snap interpolated color to dominant channel (prevents bleeding between encodings)
+// When GPU interpolates vertex colors across triangles at floor/wall boundaries,
+// the result has multiple non-zero channels causing wrong texture bleeding.
+// This snaps back to the single dominant channel.
+vec4 snap_to_dominant(vec4 c) {
+	float max_val = max(max(c.r, c.g), max(c.b, c.a));
+	if (max_val < 0.001) return vec4(1.0, 0.0, 0.0, 0.0); // Default to R channel
+	vec4 result = vec4(0.0);
+	if (c.r >= max_val - 0.001) result.r = 1.0;
+	else if (c.g >= max_val - 0.001) result.g = 1.0;
+	else if (c.b >= max_val - 0.001) result.b = 1.0;
+	else result.a = 1.0;
+	return result;
+}
+
 // Blend wall materials using vertex color weights (for soft blend mode)
 vec4 blend_wall_materials(vec2 uv, vec4 vc0, vec4 vc1, float sharpness) {
+	// Snap interpolated colors to dominant channels to prevent bleeding
+	// between floor and wall texture encodings at triangle boundaries
+	vec4 snapped_vc0 = snap_to_dominant(vc0);
+	vec4 snapped_vc1 = snap_to_dominant(vc1);
+
 	float weights[16];
-	calculate_blend_weights(vc0, vc1, sharpness, weights);
+	calculate_blend_weights(snapped_vc0, snapped_vc1, sharpness, weights);
 
 	// Map 16 ground slots to 6 wall slots (clamp to 0-5)
 	vec4 wall_color = vec4(0.0);
