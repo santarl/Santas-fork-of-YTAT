@@ -26,7 +26,8 @@ Watch the [YouTube](https://www.youtube.com/watch?v=TV3QyGNMAwo) video to get st
 
 ## Known Issues
 
-Currently none...
+1. Icons appear smaller with the new 4.6 godot standard theme (will be fixed when 4.6 officially launches)
+2. Wall textures don't disappear properly when the "void" texture is selected
 
 ## Credits
 
