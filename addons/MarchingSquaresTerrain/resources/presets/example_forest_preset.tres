@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="MarchingSquaresTerrainPreset" load_steps=2 format=3 uid="uid://btiw10gr4acth"]
+
+[ext_resource type="Script" uid="uid://dd425oc2wkrf" path="res://addons/MarchingSquaresTerrain/editor/tools/scripts/marching_squares_terrain_preset.gd" id="1_preset"]
+
+[resource]
+script = ExtResource("1_preset")
+preset_name = "Forest"
