@@ -83,6 +83,7 @@ var bd : bool
 var cd : bool
 
 var needs_update : Array[Array] # Stores which tiles need to be updated because one of their corners' heights was changed.
+var _skip_save_on_exit : bool = false # Set to true when chunk is removed temporarily (undo/redo)
 
 #terrain blend options to allow for smooth color and height blend influence at transitions and at different heights 
 var lower_thresh : float = 0.3 # Sharp bands: < 0.3 = lower color
@@ -127,12 +128,16 @@ func initialize_terrain(should_regenerate_mesh: bool = true):
 
 
 func _exit_tree() -> void:
-	if terrain_system:
+	# Only erase if terrain_system still has THIS chunk at chunk_coords
+	# (avoids double-erase when remove_chunk_from_tree already erased it)
+	if terrain_system and terrain_system.chunks.get(chunk_coords) == self:
 		terrain_system.chunks.erase(chunk_coords)
-	
-	var scene = get_tree().current_scene
-	if scene:
-		ResourceSaver.save(mesh, "res://"+scene.name+"/"+name+".tres", ResourceSaver.FLAG_COMPRESS)
+
+	# Only save mesh if not being removed temporarily (undo/redo)
+	if not _skip_save_on_exit:
+		var scene = get_tree().current_scene
+		if scene:
+			ResourceSaver.save(mesh, "res://"+scene.name+"/"+name+".tres", ResourceSaver.FLAG_COMPRESS)
 
 
 func regenerate_mesh():

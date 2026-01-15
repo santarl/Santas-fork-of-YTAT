@@ -389,7 +389,7 @@ func add_new_chunk(chunk_x: int, chunk_z: int):
 func remove_chunk(x: int, z: int):
 	var chunk_coords := Vector2i(x, z)
 	var chunk: MarchingSquaresTerrainChunk = chunks[chunk_coords]
-	chunks.erase(chunk)
+	chunks.erase(chunk_coords)  # Use chunk_coords, not chunk object
 	chunk.free()
 
 
@@ -397,7 +397,8 @@ func remove_chunk(x: int, z: int):
 func remove_chunk_from_tree(x: int, z: int):
 	var chunk_coords := Vector2i(x, z)
 	var chunk: MarchingSquaresTerrainChunk = chunks[chunk_coords]
-	chunks.erase(chunk)
+	chunks.erase(chunk_coords)  # Use chunk_coords, not chunk object
+	chunk._skip_save_on_exit = true  # Prevent mesh save during undo/redo
 	remove_child(chunk)
 	chunk.owner = null
 
@@ -406,7 +407,8 @@ func add_chunk(coords: Vector2i, chunk: MarchingSquaresTerrainChunk, regenerate_
 	chunks[coords] = chunk
 	chunk.terrain_system = self
 	chunk.chunk_coords = coords
-	
+	chunk._skip_save_on_exit = false  # Reset flag when chunk is re-added (undo restores chunk)
+
 	add_child(chunk)
 	
 	chunk.global_position = Vector3(

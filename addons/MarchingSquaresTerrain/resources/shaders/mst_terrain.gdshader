@@ -31,7 +31,7 @@ group_uniforms Blending;
 // true = Original behavior (single material, hard edges, works with "Perfect Square Tiles")
 // false = Smooth blending between materials (works with "Mixed Triangles")
 uniform bool use_hard_square_edges = false;
-uniform float blend_sharpness : hint_range(0.0, 5.0, 0.1) = 2.5;
+uniform float blend_sharpness : hint_range(0.0, 7.0, 0.1) = 4.0;
 uniform float blend_noise_scale : hint_range(0.0, 50.0, 1.0) = 10.0;
 uniform float blend_noise_strength : hint_range(0.0, 1.0, 0.05) = 0.0;
 group_uniforms;
@@ -208,7 +208,8 @@ void calculate_blend_weights(vec4 vc0, vec4 vc1, float sharpness, out float weig
 	raw_weights[15] = vc0.a * vc1.a;
 
 	// Apply sharpness via power function
-	float power = 1.0 + sharpness * 2.0;
+	// float power = 1.0 + sharpness * 2.0;
+	float power = 2.0 + sharpness * 2.0;
 	float total = 0.0;
 
 	for (int i = 0; i < 16; i++) {

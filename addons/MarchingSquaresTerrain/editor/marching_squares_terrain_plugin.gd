@@ -581,14 +581,19 @@ func draw_pattern(terrain: MarchingSquaresTerrain):
 						restore_pattern_cc[adjacent_chunk_coords][adjacent_cell_coords] = restore_value_cc
 	
 	if mode == TerrainToolMode.VERTEX_PAINTING:
-		undo_redo.create_action("terrain color_0 draw")
-		undo_redo.add_do_method(self, "draw_color_0_pattern_action", terrain, pattern)
-		undo_redo.add_undo_method(self, "draw_color_0_pattern_action", terrain, restore_pattern)
-		undo_redo.commit_action()
-		
-		undo_redo.create_action("terrain color_1 draw")
-		undo_redo.add_do_method(self, "draw_color_1_pattern_action", terrain, pattern_cc)
-		undo_redo.add_undo_method(self, "draw_color_1_pattern_action", terrain, restore_pattern_cc)
+		# Create ONE composite action instead of 2 separate actions
+		var do_patterns := {
+			"color_0": pattern,
+			"color_1": pattern_cc
+		}
+		var undo_patterns := {
+			"color_0": restore_pattern,
+			"color_1": restore_pattern_cc
+		}
+
+		undo_redo.create_action("terrain vertex paint")
+		undo_redo.add_do_method(self, "apply_composite_pattern_action", terrain, do_patterns)
+		undo_redo.add_undo_method(self, "apply_composite_pattern_action", terrain, undo_patterns)
 		undo_redo.commit_action()
 	elif mode == TerrainToolMode.GRASS_MASK:
 		undo_redo.create_action("terrain grass mask draw")
@@ -596,13 +601,12 @@ func draw_pattern(terrain: MarchingSquaresTerrain):
 		undo_redo.add_undo_method(self, "draw_grass_mask_pattern_action", terrain, restore_pattern)
 		undo_redo.commit_action()
 	else:
-		# TIMING FIX: Apply wall colors BEFORE height action when using presets
-		# This ensures that when regenerate_mesh() creates ridge vertices during the height action,
-		# the wall_color_map already has the correct preset values (not old/default values).
-		# Ridge vertices are floor vertices near cliff edges that render as walls.
+		# Handle BRUSH, LEVEL, SMOOTH, BRIDGE modes
 		if selected_preset:
-			# Apply WALL texture from preset FIRST (before height changes)
-			# Walls appear at boundaries, so we need to expand the pattern to include adjacent cells
+			# PRESET MODE: Apply all changes as ONE atomic undo/redo action
+			# This fixes the issue where 6 separate actions were created per brush stroke
+
+			# Build wall color patterns (with expansion to adjacent cells for boundary walls)
 			_set_vertex_colors(selected_preset.wall_texture_slot)
 
 			var wall_color_pattern := {}
@@ -674,27 +678,7 @@ func draw_pattern(terrain: MarchingSquaresTerrain):
 							wall_color_pattern[adj_chunk_coords][adj_cell] = vertex_color_0
 							wall_color_pattern_cc[adj_chunk_coords][adj_cell] = vertex_color_1
 
-			undo_redo.create_action("preset wall texture")
-			undo_redo.add_do_method(self, "draw_wall_color_0_pattern_action", terrain, wall_color_pattern)
-			undo_redo.add_undo_method(self, "draw_wall_color_0_pattern_action", terrain, wall_color_restore)
-			undo_redo.commit_action()
-
-			undo_redo.create_action("preset wall texture cc")
-			undo_redo.add_do_method(self, "draw_wall_color_1_pattern_action", terrain, wall_color_pattern_cc)
-			undo_redo.add_undo_method(self, "draw_wall_color_1_pattern_action", terrain, wall_color_restore_cc)
-			undo_redo.commit_action()
-
-		# NOW apply height action - ridges will be created with correct wall colors
-		undo_redo.create_action("terrain height draw")
-		undo_redo.add_do_method(self, "draw_height_pattern_action", terrain, pattern)
-		undo_redo.add_undo_method(self, "draw_height_pattern_action", terrain, restore_pattern)
-		undo_redo.commit_action()
-
-		# Apply remaining preset settings (grass mask and ground colors) after height changes
-		if selected_preset:
-			# Apply grass mask from preset
-			# has_grass=true: Force grass ON (green channel = 1)
-			# has_grass=false: Force grass OFF (red channel = 0, masked)
+			# Build grass mask patterns
 			var grass_pattern := {}
 			var grass_restore := {}
 			for chunk_coords in pattern:
@@ -704,18 +688,11 @@ func draw_pattern(terrain: MarchingSquaresTerrain):
 				for cell_coords in pattern[chunk_coords]:
 					grass_restore[chunk_coords][cell_coords] = chunk.get_grass_mask(cell_coords)
 					if selected_preset.has_grass:
-						# Force grass ON: set green channel to override texture setting
 						grass_pattern[chunk_coords][cell_coords] = Color(1, 1, 0, 0)
 					else:
-						# Force grass OFF: clear red channel to mask out grass
 						grass_pattern[chunk_coords][cell_coords] = Color(0, 0, 0, 0)
 
-			undo_redo.create_action("preset grass mask")
-			undo_redo.add_do_method(self, "draw_grass_mask_pattern_action", terrain, grass_pattern)
-			undo_redo.add_undo_method(self, "draw_grass_mask_pattern_action", terrain, grass_restore)
-			undo_redo.commit_action()
-
-			# Set vertex colors from preset's ground texture slot
+			# Build ground color patterns
 			_set_vertex_colors(selected_preset.ground_texture_slot)
 
 			var color_pattern := {}
@@ -735,14 +712,33 @@ func draw_pattern(terrain: MarchingSquaresTerrain):
 					color_pattern[chunk_coords][cell_coords] = vertex_color_0
 					color_pattern_cc[chunk_coords][cell_coords] = vertex_color_1
 
-			undo_redo.create_action("preset ground texture")
-			undo_redo.add_do_method(self, "draw_color_0_pattern_action", terrain, color_pattern)
-			undo_redo.add_undo_method(self, "draw_color_0_pattern_action", terrain, color_restore)
-			undo_redo.commit_action()
+			# Create ONE composite action instead of 6 separate actions
+			var do_patterns := {
+				"height": pattern,
+				"wall_color_0": wall_color_pattern,
+				"wall_color_1": wall_color_pattern_cc,
+				"grass_mask": grass_pattern,
+				"color_0": color_pattern,
+				"color_1": color_pattern_cc
+			}
+			var undo_patterns := {
+				"height": restore_pattern,
+				"wall_color_0": wall_color_restore,
+				"wall_color_1": wall_color_restore_cc,
+				"grass_mask": grass_restore,
+				"color_0": color_restore,
+				"color_1": color_restore_cc
+			}
 
-			undo_redo.create_action("preset ground texture cc")
-			undo_redo.add_do_method(self, "draw_color_1_pattern_action", terrain, color_pattern_cc)
-			undo_redo.add_undo_method(self, "draw_color_1_pattern_action", terrain, color_restore_cc)
+			undo_redo.create_action("terrain brush with preset")
+			undo_redo.add_do_method(self, "apply_composite_pattern_action", terrain, do_patterns)
+			undo_redo.add_undo_method(self, "apply_composite_pattern_action", terrain, undo_patterns)
+			undo_redo.commit_action()
+		else:
+			# NON-PRESET MODE: Height-only action (unchanged behavior)
+			undo_redo.create_action("terrain height draw")
+			undo_redo.add_do_method(self, "draw_height_pattern_action", terrain, pattern)
+			undo_redo.add_undo_method(self, "draw_height_pattern_action", terrain, restore_pattern)
 			undo_redo.commit_action()
 
 
@@ -803,6 +799,69 @@ func draw_wall_color_1_pattern_action(terrain: MarchingSquaresTerrain, pattern: 
 		for draw_cell_coords: Vector2i in draw_chunk_dict:
 			var color: Color = draw_chunk_dict[draw_cell_coords]
 			chunk.draw_wall_color_1(draw_cell_coords.x, draw_cell_coords.y, color)
+		chunk.regenerate_mesh()
+
+
+## Applies all terrain patterns atomically (for preset brush and vertex painting operations)
+## patterns dict keys: "height", "wall_color_0", "wall_color_1", "grass_mask", "color_0", "color_1"
+## This consolidates multiple data changes into ONE undo/redo action with ONE mesh regeneration
+func apply_composite_pattern_action(terrain: MarchingSquaresTerrain, patterns: Dictionary) -> void:
+	var affected_chunks : Dictionary = {}  # chunk_coords -> chunk reference
+
+	# Apply wall colors FIRST (before height changes that create ridge vertices)
+	if patterns.has("wall_color_0"):
+		for chunk_coords: Vector2i in patterns.wall_color_0:
+			var chunk: MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			if chunk:
+				affected_chunks[chunk_coords] = chunk
+				for cell_coords: Vector2i in patterns.wall_color_0[chunk_coords]:
+					chunk.draw_wall_color_0(cell_coords.x, cell_coords.y, patterns.wall_color_0[chunk_coords][cell_coords])
+
+	if patterns.has("wall_color_1"):
+		for chunk_coords: Vector2i in patterns.wall_color_1:
+			var chunk: MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			if chunk:
+				affected_chunks[chunk_coords] = chunk
+				for cell_coords: Vector2i in patterns.wall_color_1[chunk_coords]:
+					chunk.draw_wall_color_1(cell_coords.x, cell_coords.y, patterns.wall_color_1[chunk_coords][cell_coords])
+
+	# Apply height changes (triggers ridge creation which uses wall colors)
+	if patterns.has("height"):
+		for chunk_coords: Vector2i in patterns.height:
+			var chunk: MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			if chunk:
+				affected_chunks[chunk_coords] = chunk
+				for cell_coords: Vector2i in patterns.height[chunk_coords]:
+					chunk.draw_height(cell_coords.x, cell_coords.y, patterns.height[chunk_coords][cell_coords])
+
+	# Apply grass mask
+	if patterns.has("grass_mask"):
+		for chunk_coords: Vector2i in patterns.grass_mask:
+			var chunk: MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			if chunk:
+				affected_chunks[chunk_coords] = chunk
+				for cell_coords: Vector2i in patterns.grass_mask[chunk_coords]:
+					chunk.draw_grass_mask(cell_coords.x, cell_coords.y, patterns.grass_mask[chunk_coords][cell_coords])
+
+	# Apply ground colors LAST
+	if patterns.has("color_0"):
+		for chunk_coords: Vector2i in patterns.color_0:
+			var chunk: MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			if chunk:
+				affected_chunks[chunk_coords] = chunk
+				for cell_coords: Vector2i in patterns.color_0[chunk_coords]:
+					chunk.draw_color_0(cell_coords.x, cell_coords.y, patterns.color_0[chunk_coords][cell_coords])
+
+	if patterns.has("color_1"):
+		for chunk_coords: Vector2i in patterns.color_1:
+			var chunk: MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			if chunk:
+				affected_chunks[chunk_coords] = chunk
+				for cell_coords: Vector2i in patterns.color_1[chunk_coords]:
+					chunk.draw_color_1(cell_coords.x, cell_coords.y, patterns.color_1[chunk_coords][cell_coords])
+
+	# Regenerate mesh ONCE for each affected chunk (instead of 6 times!)
+	for chunk in affected_chunks.values():
 		chunk.regenerate_mesh()
 
 
