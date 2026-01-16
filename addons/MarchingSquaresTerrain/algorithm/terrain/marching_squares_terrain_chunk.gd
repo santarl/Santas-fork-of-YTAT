@@ -76,7 +76,10 @@ var cell_wall_upper_color_0 : Color
 var cell_wall_lower_color_1 : Color
 var cell_wall_upper_color_1 : Color
 var cell_is_boundary : bool = false
-# Edge connected state	
+# Per-cell material pair for phantom fix (computed once per cell)
+var cell_mat_a : int = 0
+var cell_mat_b : int = 0
+# Edge connected state
 var ab : bool
 var ac : bool
 var bd : bool
@@ -147,7 +150,8 @@ func regenerate_mesh():
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_custom_format(0, SurfaceTool.CUSTOM_RGBA_FLOAT)
 	st.set_custom_format(1, SurfaceTool.CUSTOM_RGBA_FLOAT)
-	
+	st.set_custom_format(2, SurfaceTool.CUSTOM_RGBA_FLOAT)  # PHANTOM FIX: mat_indices + blend_weight
+
 	var start_time: int = Time.get_ticks_msec()
 	
 	if not find_child("GrassPlanter"):
@@ -209,6 +213,7 @@ func generate_terrain_cells():
 				var colors_0 = cell_geometry[cell_coords]["colors_0"]
 				var colors_1 = cell_geometry[cell_coords]["colors_1"]
 				var grass_mask = cell_geometry[cell_coords]["grass_mask"]
+				var mat_blend = cell_geometry[cell_coords]["mat_blend"]
 				var is_floor = cell_geometry[cell_coords]["is_floor"]
 				for i in range(len(verts)):
 					st.set_smooth_group(0 if is_floor[i] == true else -1)
@@ -217,6 +222,7 @@ func generate_terrain_cells():
 					st.set_color(colors_0[i])
 					st.set_custom(0, colors_1[i])
 					st.set_custom(1, grass_mask[i])
+					st.set_custom(2, mat_blend[i])
 					st.add_vertex(verts[i])
 				continue
 			
@@ -232,6 +238,7 @@ func generate_terrain_cells():
 				"colors_0": PackedColorArray(),
 				"colors_1": PackedColorArray(),
 				"grass_mask": PackedColorArray(),
+				"mat_blend": PackedColorArray(),
 				"is_floor": [],
 			}
 			
@@ -249,6 +256,9 @@ func generate_terrain_cells():
 
 			# Determine if this is a boundary cell (significant height variation)
 			cell_is_boundary = (cell_max_height - cell_min_height) > merge_threshold
+
+			# Calculate the 2 dominant textures for this cell ONCE (phantom fix)
+			calculate_cell_material_pair(color_map_0, color_map_1)
 
 			if cell_is_boundary:
 				# Identify corners at each height level for height-based color sampling
@@ -746,7 +756,11 @@ func add_point(x: float, y: float, z: float, uv_x: float = 0, uv_y: float = 0, d
 	var g_mask: Color = grass_mask_map[cell_coords.y*dimensions.x + cell_coords.x]
 	g_mask.g = 1.0 if is_ridge else 0.0
 	st.set_custom(1, g_mask)
-	
+
+	# CUSTOM2: Material blend data for phantom fix
+	var mat_blend : Color = calculate_material_blend_data(x, z, source_map_0, source_map_1)
+	st.set_custom(2, mat_blend)
+
 	var vert = Vector3((cell_coords.x+x) * cell_size.x, y, (cell_coords.y+z) * cell_size.y)
 	var uv2
 	if floor_mode:
@@ -764,6 +778,7 @@ func add_point(x: float, y: float, z: float, uv_x: float = 0, uv_y: float = 0, d
 	cell_geometry[cell_coords]["colors_0"].append(color_0)
 	cell_geometry[cell_coords]["colors_1"].append(color_1)
 	cell_geometry[cell_coords]["grass_mask"].append(g_mask)
+	cell_geometry[cell_coords]["mat_blend"].append(mat_blend)
 	cell_geometry[cell_coords]["is_floor"].append(floor_mode)
 
 
@@ -788,6 +803,110 @@ func get_dominant_color(c: Color) -> Color:
 		3: new_color.a = 1.0
 	
 	return new_color
+
+
+## Convert vertex color pair to texture index (0-15) - PHANTOM FIX
+func get_texture_index_from_colors(c0: Color, c1: Color) -> int:
+	var c0_idx : int = 0
+	var c0_max : float = c0.r
+	if c0.g > c0_max: c0_max = c0.g; c0_idx = 1
+	if c0.b > c0_max: c0_max = c0.b; c0_idx = 2
+	if c0.a > c0_max: c0_idx = 3
+
+	var c1_idx : int = 0
+	var c1_max : float = c1.r
+	if c1.g > c1_max: c1_max = c1.g; c1_idx = 1
+	if c1.b > c1_max: c1_max = c1.b; c1_idx = 2
+	if c1.a > c1_max: c1_idx = 3
+
+	return c0_idx * 4 + c1_idx
+
+
+## Convert texture index (0-15) back to color pair - PHANTOM FIX
+func texture_index_to_colors(idx: int) -> Array[Color]:
+	var c0_channel : int = idx / 4
+	var c1_channel : int = idx % 4
+	var c0 := Color(0, 0, 0, 0)
+	var c1 := Color(0, 0, 0, 0)
+	match c0_channel:
+		0: c0.r = 1.0
+		1: c0.g = 1.0
+		2: c0.b = 1.0
+		3: c0.a = 1.0
+	match c1_channel:
+		0: c1.r = 1.0
+		1: c1.g = 1.0
+		2: c1.b = 1.0
+		3: c1.a = 1.0
+	return [c0, c1]
+
+
+## Calculate 2 dominant textures for current cell (prevents phantom textures) - PHANTOM FIX
+func calculate_cell_material_pair(source_map_0: PackedColorArray, source_map_1: PackedColorArray) -> void:
+	var tex_a : int = get_texture_index_from_colors(
+		source_map_0[cell_coords.y * dimensions.x + cell_coords.x],
+		source_map_1[cell_coords.y * dimensions.x + cell_coords.x])
+	var tex_b : int = get_texture_index_from_colors(
+		source_map_0[cell_coords.y * dimensions.x + cell_coords.x + 1],
+		source_map_1[cell_coords.y * dimensions.x + cell_coords.x + 1])
+	var tex_c : int = get_texture_index_from_colors(
+		source_map_0[(cell_coords.y + 1) * dimensions.x + cell_coords.x],
+		source_map_1[(cell_coords.y + 1) * dimensions.x + cell_coords.x])
+	var tex_d : int = get_texture_index_from_colors(
+		source_map_0[(cell_coords.y + 1) * dimensions.x + cell_coords.x + 1],
+		source_map_1[(cell_coords.y + 1) * dimensions.x + cell_coords.x + 1])
+
+	var tex_counts : Dictionary = {}
+	tex_counts[tex_a] = tex_counts.get(tex_a, 0) + 1
+	tex_counts[tex_b] = tex_counts.get(tex_b, 0) + 1
+	tex_counts[tex_c] = tex_counts.get(tex_c, 0) + 1
+	tex_counts[tex_d] = tex_counts.get(tex_d, 0) + 1
+
+	var sorted_textures : Array = tex_counts.keys()
+	sorted_textures.sort_custom(func(a, b): return tex_counts[a] > tex_counts[b])
+
+	cell_mat_a = sorted_textures[0]
+	cell_mat_b = sorted_textures[1] if sorted_textures.size() > 1 else sorted_textures[0]
+
+
+## Calculate CUSTOM2 blend data: Color(mat_a/15, mat_b/15, blend_weight, 0) - PHANTOM FIX
+func calculate_material_blend_data(vert_x: float, vert_z: float, source_map_0: PackedColorArray, source_map_1: PackedColorArray) -> Color:
+	var tex_a : int = get_texture_index_from_colors(
+		source_map_0[cell_coords.y * dimensions.x + cell_coords.x],
+		source_map_1[cell_coords.y * dimensions.x + cell_coords.x])
+	var tex_b : int = get_texture_index_from_colors(
+		source_map_0[cell_coords.y * dimensions.x + cell_coords.x + 1],
+		source_map_1[cell_coords.y * dimensions.x + cell_coords.x + 1])
+	var tex_c : int = get_texture_index_from_colors(
+		source_map_0[(cell_coords.y + 1) * dimensions.x + cell_coords.x],
+		source_map_1[(cell_coords.y + 1) * dimensions.x + cell_coords.x])
+	var tex_d : int = get_texture_index_from_colors(
+		source_map_0[(cell_coords.y + 1) * dimensions.x + cell_coords.x + 1],
+		source_map_1[(cell_coords.y + 1) * dimensions.x + cell_coords.x + 1])
+
+	var weight_a : float = (1.0 - vert_x) * (1.0 - vert_z)
+	var weight_b : float = vert_x * (1.0 - vert_z)
+	var weight_c : float = (1.0 - vert_x) * vert_z
+	var weight_d : float = vert_x * vert_z
+
+	var weight_mat_a : float = 0.0
+	var weight_mat_b : float = 0.0
+
+	if tex_a == cell_mat_a: weight_mat_a += weight_a
+	elif tex_a == cell_mat_b: weight_mat_b += weight_a
+	if tex_b == cell_mat_a: weight_mat_a += weight_b
+	elif tex_b == cell_mat_b: weight_mat_b += weight_b
+	if tex_c == cell_mat_a: weight_mat_a += weight_c
+	elif tex_c == cell_mat_b: weight_mat_b += weight_c
+	if tex_d == cell_mat_a: weight_mat_a += weight_d
+	elif tex_d == cell_mat_b: weight_mat_b += weight_d
+
+	var total_weight : float = weight_mat_a + weight_mat_b
+	var blend_weight : float = 0.0
+	if total_weight > 0.001:
+		blend_weight = weight_mat_b / total_weight
+
+	return Color(float(cell_mat_a) / 15.0, float(cell_mat_b) / 15.0, blend_weight, 0.0)
 
 
 # If true, currently making floor geometry. if false, currently making wall geometry.

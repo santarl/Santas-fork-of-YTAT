@@ -1,74 +1,7 @@
-[gd_resource type="ShaderMaterial" load_steps=14 format=3 uid="uid://bahbybbjwkhlg"]
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://bahbybbjwkhlg"]
 
 [ext_resource type="Shader" uid="uid://ltkimbmrvpyo" path="res://addons/MarchingSquaresTerrain/resources/shaders/mst_terrain.gdshader" id="1_cywoj"]
-[ext_resource type="Texture2D" uid="uid://csvthlqhb8g5j" path="res://addons/MarchingSquaresTerrain/resources/materials/void_texture.tres" id="2_30qmr"]
-[ext_resource type="Texture2D" uid="uid://dbnc04k3n0sro" path="res://addons/MarchingSquaresTerrain/resources/materials/grass_terrain_noise.res" id="2_f8vgh"]
-[ext_resource type="Texture2D" uid="uid://3miu3736q5b6" path="res://LocalDev/new_gradient_texture_545.tres" id="3_bdsl8"]
-[ext_resource type="Texture2D" uid="uid://7nt26edxws6y" path="res://LocalDev/new_gradient_texture_55.tres" id="4_o86na"]
-[ext_resource type="Texture2D" uid="uid://bmrahuv0exto0" path="res://LocalDev/new_gradient_texture_1d33.tres" id="5_kgmxq"]
-[ext_resource type="Texture2D" uid="uid://c57mx1iuklk42" path="res://LocalDev/new_gradient_texture_1d22222.tres" id="6_cjhn3"]
-[ext_resource type="Texture2D" uid="uid://bm03ykjwcunvg" path="res://LocalDev/new_gradient_texture_1d222.tres" id="7_cvjlr"]
-[ext_resource type="Texture2D" uid="uid://b66nsplhfh6l8" path="res://LocalDev/new_gradient_texture_1d3.tres" id="8_pr8xx"]
-[ext_resource type="Texture2D" uid="uid://cm2njjugxpte8" path="res://LocalDev/new_gradient_texture_1d4.tres" id="9_ctai0"]
-[ext_resource type="Texture2D" uid="uid://cmglrmnvlslyd" path="res://LocalDev/new_gradient_texture_1d.tres" id="10_5wg0q"]
-
-[sub_resource type="Gradient" id="Gradient_wkxb7"]
-offsets = PackedFloat32Array(0)
-colors = PackedColorArray(0.14117648, 0.9254902, 0.6, 1)
-
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_ee8hc"]
-gradient = SubResource("Gradient_wkxb7")
 
 [resource]
 render_priority = 0
 shader = ExtResource("1_cywoj")
-shader_parameter/wall_threshold = 0.0
-shader_parameter/chunk_size = Vector3i(33, 32, 33)
-shader_parameter/ground_albedo = Color(0.392, 0.471, 0.318, 1)
-shader_parameter/ground_albedo_2 = Color(0.322, 0.482, 0.384, 1)
-shader_parameter/ground_albedo_3 = Color(0.4305174, 0.5839844, 0.19047928, 1)
-shader_parameter/ground_albedo_4 = Color(0.4390893, 0.5488281, 0.25619125, 1)
-shader_parameter/ground_albedo_5 = Color(0.43764114, 0.6894531, 0.65348, 1)
-shader_parameter/ground_albedo_6 = Color(0.7832031, 0.678854, 0.4573784, 1)
-shader_parameter/wall_albedo = Color(0.36862746, 0.3372549, 0.27058825, 1)
-shader_parameter/wall_albedo_2 = Color(1, 1, 1, 1)
-shader_parameter/wall_albedo_3 = Color(0.3190117, 0.6483079, 0.6777344, 1)
-shader_parameter/wall_albedo_4 = Color(0.38039216, 0.34117648, 0.27058825, 1)
-shader_parameter/wall_albedo_5 = Color(0.6933594, 0.62832505, 0.48074722, 1)
-shader_parameter/wall_albedo_6 = Color(0.41960785, 0.38039216, 0.29803923, 1)
-shader_parameter/wall_tex_1 = ExtResource("2_f8vgh")
-shader_parameter/wall_tex_2 = ExtResource("2_f8vgh")
-shader_parameter/wall_tex_3 = ExtResource("2_f8vgh")
-shader_parameter/use_hard_square_edges = false
-shader_parameter/blend_sharpness = 4.0
-shader_parameter/blend_noise_scale = 10.0
-shader_parameter/blend_noise_strength = 0.0
-shader_parameter/use_height_blend = false
-shader_parameter/height_blend_strength = 0.5
-shader_parameter/height_low = 0.0
-shader_parameter/height_mid = 5.0
-shader_parameter/height_high = 10.0
-shader_parameter/height_transition_smoothness = 1.0
-shader_parameter/material_low = 0
-shader_parameter/material_mid = 1
-shader_parameter/material_high = 2
-shader_parameter/height_noise_strength = 1.0
-shader_parameter/vc_tex_rr = ExtResource("2_f8vgh")
-shader_parameter/vc_tex_rg = ExtResource("2_f8vgh")
-shader_parameter/vc_tex_rb = ExtResource("2_f8vgh")
-shader_parameter/vc_tex_ra = ExtResource("2_f8vgh")
-shader_parameter/vc_tex_gr = ExtResource("2_f8vgh")
-shader_parameter/vc_tex_gg = ExtResource("2_f8vgh")
-shader_parameter/vc_tex_gb = ExtResource("10_5wg0q")
-shader_parameter/vc_tex_ga = SubResource("GradientTexture1D_ee8hc")
-shader_parameter/vc_tex_br = ExtResource("9_ctai0")
-shader_parameter/vc_tex_bg = ExtResource("8_pr8xx")
-shader_parameter/vc_tex_bb = ExtResource("7_cvjlr")
-shader_parameter/vc_tex_ba = ExtResource("6_cjhn3")
-shader_parameter/vc_tex_ar = ExtResource("5_kgmxq")
-shader_parameter/vc_tex_ag = ExtResource("4_o86na")
-shader_parameter/vc_tex_ab = ExtResource("3_bdsl8")
-shader_parameter/vc_tex_aa = ExtResource("2_30qmr")
-shader_parameter/shadow_color = Color(0, 0, 0, 1)
-shader_parameter/bands = 5
-shader_parameter/shadow_intensity = 0.0

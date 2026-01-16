@@ -31,23 +31,11 @@ group_uniforms Blending;
 // true = Original behavior (single material, hard edges, works with "Perfect Square Tiles")
 // false = Smooth blending between materials (works with "Mixed Triangles")
 uniform bool use_hard_square_edges = false;
-uniform float blend_sharpness : hint_range(0.0, 7.0, 0.1) = 4.0;
+uniform float blend_sharpness : hint_range(0.0, 10.0, 0.1) = 5.0;
 uniform float blend_noise_scale : hint_range(0.0, 50.0, 1.0) = 10.0;
 uniform float blend_noise_strength : hint_range(0.0, 1.0, 0.05) = 0.0;
 group_uniforms;
 
-group_uniforms Height_Blending;
-uniform bool use_height_blend = false;
-uniform float height_blend_strength : hint_range(0.0, 1.0, 0.05) = 0.5;
-uniform float height_low : hint_range(-50.0, 50.0, 0.5) = 0.0;
-uniform float height_mid : hint_range(-50.0, 50.0, 0.5) = 5.0;
-uniform float height_high : hint_range(-50.0, 50.0, 0.5) = 10.0;
-uniform float height_transition_smoothness : hint_range(0.1, 5.0, 0.1) = 1.0;
-uniform int material_low : hint_range(0, 15) = 0;
-uniform int material_mid : hint_range(0, 15) = 1;
-uniform int material_high : hint_range(0, 15) = 2;
-uniform float height_noise_strength : hint_range(0.0, 5.0, 0.1) = 1.0;
-group_uniforms;
 
 group_uniforms Vertex_Colors;
 uniform sampler2D vc_tex_rr : source_color;
@@ -85,6 +73,10 @@ varying flat int material_index;
 // Soft blend mode: interpolated vertex colors
 varying vec4 vc_color_0;
 varying vec4 vc_color_1;
+
+// Phantom fix: Per-cell material indices (flat = no GPU interpolation)
+varying flat vec2 mat_indices;
+varying float mat_blend_weight;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -282,30 +274,6 @@ vec4 blend_wall_materials(vec2 uv, vec4 vc0, vec4 vc1, float sharpness) {
 }
 
 // ============================================================================
-// HEIGHT BLENDING FUNCTIONS
-// ============================================================================
-
-void calculate_height_weights(float height, vec2 noise_pos, out float low_weight, out float mid_weight, out float high_weight) {
-	float height_noise = fbm(noise_pos * blend_noise_scale * 0.3, 3) * 2.0 - 1.0;
-	float h = height + height_noise * height_noise_strength;
-	
-	float low_to_mid = height_low + (height_mid - height_low) * 0.5;
-	float mid_to_high = height_mid + (height_high - height_mid) * 0.5;
-	float transition_size = height_transition_smoothness;
-	
-	low_weight = 1.0 - smoothstep(height_low - transition_size * 0.5, low_to_mid + transition_size * 0.5, h);
-	high_weight = smoothstep(mid_to_high - transition_size * 0.5, height_high + transition_size * 0.5, h);
-	mid_weight = max(1.0 - low_weight - high_weight, 0.0);
-	
-	float total = low_weight + mid_weight + high_weight;
-	if (total > 0.0) {
-		low_weight /= total;
-		mid_weight /= total;
-		high_weight /= total;
-	}
-}
-
-// ============================================================================
 // VERTEX SHADER
 // ============================================================================
 
@@ -320,6 +288,10 @@ void vertex() {
 	// Soft blend: pass interpolated vertex colors to fragment
 	vc_color_0 = COLOR;
 	vc_color_1 = CUSTOM0;
+
+	// CUSTOM2 contains per-cell material blend data: (mat_a/15, mat_b/15, blend_weight, 0)
+	mat_indices = vec2(CUSTOM2.r, CUSTOM2.g);
+	mat_blend_weight = CUSTOM2.b;
 }
 
 // ============================================================================
@@ -341,45 +313,32 @@ void fragment() {
 			floor_color = sample_material_by_index(material_index, floor_uv);
 		}
 		
-		//Soft Blend mode applicable when we have triangules
+		//Soft Blend mode applicable when we have triangles - PHANTOM FIX
 		else {
-			// Apply noise to sharpness for organic edges
-			float effective_sharpness = blend_sharpness;
+			// PHANTOM FIX: Use per-cell material indices (flat = no interpolation)
+			int mat_a = int(round(mat_indices.x * 15.0));
+			int mat_b = int(round(mat_indices.y * 15.0));
+			float blend_weight = mat_blend_weight;
+
 			if (blend_noise_strength > 0.0) {
 				float n = noise(world_pos.xz * blend_noise_scale);
-				effective_sharpness = mix(blend_sharpness, blend_sharpness * (0.5 + n), blend_noise_strength);
+				blend_weight = clamp(blend_weight + (n - 0.5) * blend_noise_strength, 0.0, 1.0);
 			}
 
-			// Calculate blend weights
-			float weights[16];
-			calculate_blend_weights(vc_color_0, vc_color_1, effective_sharpness, weights);
-
-			// Sample and blend materials
-			floor_color = vec4(0.0);
-			float total_weight = 0.0;
-			for (int i = 0; i < 16; i++) {
-				if (weights[i] > 0.01) {
-					floor_color += sample_material_by_index(i, floor_uv) * weights[i];
-					total_weight += weights[i];
+			if (blend_sharpness > 0.0) {
+				float power = 1.0 + blend_sharpness;
+				if (blend_weight < 0.5) {
+					blend_weight = 0.5 * pow(2.0 * blend_weight, power);
+				} else {
+					blend_weight = 1.0 - 0.5 * pow(2.0 * (1.0 - blend_weight), power);
 				}
 			}
-			if (total_weight > 0.001) {
-				floor_color /= total_weight;
-			}
+
+			vec4 color_a = sample_material_by_index(mat_a, floor_uv);
+			vec4 color_b = sample_material_by_index(mat_b, floor_uv);
+			floor_color = mix(color_a, color_b, blend_weight);
 		}
 
-		// HEIGHT BLENDING (Optional, works with both modes) - Can remove it not in the Roadmap...
-		if (use_height_blend) {
-			float low_w, mid_w, high_w;
-			calculate_height_weights(world_pos.y, world_pos.xz, low_w, mid_w, high_w);
-
-			vec4 height_color = vec4(0.0);
-			if (low_w > 0.01) height_color += sample_material_by_index(material_low, floor_uv) * low_w;
-			if (mid_w > 0.01) height_color += sample_material_by_index(material_mid, floor_uv) * mid_w;
-			if (high_w > 0.01) height_color += sample_material_by_index(material_high, floor_uv) * high_w;
-
-			floor_color = mix(floor_color, height_color, height_blend_strength);
-		}
 
 		ALBEDO = floor_color.rgb;
 		ALPHA = floor_color.a;
