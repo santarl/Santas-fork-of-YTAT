@@ -193,7 +193,11 @@ func _on_terrain_setting_changed(p_setting_name: String, p_value: Variant) -> vo
 
 
 func _on_texture_setting_changed(p_setting_name: String, p_value: Variant) -> void:
+	# print("Texture setting changed: ", p_setting_name, " to ", p_value)
 	var terrain := plugin.current_terrain_node
+	if not terrain:
+		push_warning("[MarchingSquaresUI] No current terrain node to apply texture settings to.")
+		return
 	match p_setting_name:
 		"ground_texture":
 			if p_value is Texture2D or p_value == null:
@@ -329,3 +333,6 @@ func _on_texture_setting_changed(p_setting_name: String, p_value: Variant) -> vo
 		"wall_color_6":
 			if p_value is Color:
 				terrain.wall_color_6 = p_value
+
+	# Finally, save to preset
+	terrain.save_to_preset()
