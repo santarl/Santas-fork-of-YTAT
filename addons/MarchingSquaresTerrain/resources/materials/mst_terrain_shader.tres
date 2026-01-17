@@ -1,27 +1,28 @@
-[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://bahbybbjwkhlg"]
+[gd_resource type="ShaderMaterial" load_steps=5 format=3 uid="uid://bahbybbjwkhlg"]
 
 [ext_resource type="Shader" uid="uid://ltkimbmrvpyo" path="res://addons/MarchingSquaresTerrain/resources/shaders/mst_terrain.gdshader" id="1_cywoj"]
 [ext_resource type="Texture2D" uid="uid://csvthlqhb8g5j" path="res://addons/MarchingSquaresTerrain/resources/materials/void_texture.tres" id="2_f8vgh"]
 [ext_resource type="Texture2D" uid="uid://dbnc04k3n0sro" path="res://addons/MarchingSquaresTerrain/resources/materials/grass_terrain_noise.res" id="3_30qmr"]
+[ext_resource type="Texture2D" uid="uid://cv87twjgbqq0s" path="res://addons/MarchingSquaresTerrain/resources/materials/wall_noise_texture.res" id="4_30qmr"]
 
 [resource]
 render_priority = 0
 shader = ExtResource("1_cywoj")
 shader_parameter/wall_threshold = 0.0
-shader_parameter/chunk_size = Vector3i(33, 32, 33)
-shader_parameter/ground_albedo = Color(0.392, 0.471, 0.318, 1)
-shader_parameter/ground_albedo_2 = Color(0.322, 0.482, 0.384, 1)
-shader_parameter/ground_albedo_3 = Color(0.373, 0.424, 0.294, 1)
-shader_parameter/ground_albedo_4 = Color(0.392, 0.475, 0.255, 1)
-shader_parameter/ground_albedo_5 = Color(0.29, 0.494, 0.365, 1)
-shader_parameter/ground_albedo_6 = Color(0.443, 0.447, 0.365, 1)
-shader_parameter/wall_albedo = Color(0.369, 0.337, 0.271, 1)
-shader_parameter/wall_albedo_2 = Color(0.4, 0.35, 0.28, 1)
-shader_parameter/wall_albedo_3 = Color(0.35, 0.32, 0.25, 1)
-shader_parameter/wall_albedo_4 = Color(0.38, 0.34, 0.27, 1)
-shader_parameter/wall_albedo_5 = Color(0.36, 0.33, 0.26, 1)
-shader_parameter/wall_albedo_6 = Color(0.42, 0.38, 0.3, 1)
-shader_parameter/wall_tex_1 = ExtResource("3_30qmr")
+shader_parameter/chunk_size = Vector3i(32, 32, 32)
+shader_parameter/ground_albedo = Color(0.39215687, 0.47058824, 0.31764707, 1)
+shader_parameter/ground_albedo_2 = Color(0.30519673, 0.4626618, 0.5514242, 1)
+shader_parameter/ground_albedo_3 = Color(0.72663283, 0.4819908, 0.8144531, 1)
+shader_parameter/ground_albedo_4 = Color(0.6833746, 0.58623713, 0.35598898, 1)
+shader_parameter/ground_albedo_5 = Color(0.48235673, 0.62252915, 0.2718495, 1)
+shader_parameter/ground_albedo_6 = Color(0.44313726, 0.44705883, 0.3647059, 1)
+shader_parameter/wall_albedo = Color(0.36862746, 0.3372549, 0.27058825, 1)
+shader_parameter/wall_albedo_2 = Color(0.25874504, 0.34447184, 0.59553534, 1)
+shader_parameter/wall_albedo_3 = Color(0.34901962, 0.32156864, 0.2509804, 1)
+shader_parameter/wall_albedo_4 = Color(0.48598963, 0.40865216, 0.22741425, 1)
+shader_parameter/wall_albedo_5 = Color(0.36078432, 0.32941177, 0.25882354, 1)
+shader_parameter/wall_albedo_6 = Color(0.41960785, 0.38039216, 0.29803923, 1)
+shader_parameter/wall_tex_1 = ExtResource("4_30qmr")
 shader_parameter/wall_tex_2 = ExtResource("3_30qmr")
 shader_parameter/wall_tex_3 = ExtResource("3_30qmr")
 shader_parameter/wall_tex_4 = ExtResource("3_30qmr")

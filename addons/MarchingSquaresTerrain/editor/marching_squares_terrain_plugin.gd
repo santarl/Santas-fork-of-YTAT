@@ -931,10 +931,11 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 	for i in range(6): # The range is 6 because MarchingSquaresTextureList currently has 6 export variables
 		match i:
 			0: # floor_textures
-				for tex in _preset.new_textures.floor_textures:
-					if tex == null or tex.get_class() == "Texture2D":
+				for i_floor_text in range(_preset.new_textures.floor_textures.size()):
+					var tex: Texture2D = _preset.new_textures.floor_textures[i_floor_text]
+					if tex == null:
 						continue
-					match _preset.new_textures.floor_textures.find(tex):
+					match i_floor_text:
 						0:
 							current_terrain_node.ground_texture = tex
 						1:
@@ -963,11 +964,14 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 							current_terrain_node.texture_13 = tex
 						13:
 							current_terrain_node.texture_14 = tex
+						14: #Are we not adding 14 cause texture_15 is used for VOID?
+							current_terrain_node.texture_15 = tex
 			1: # grass_sprites
-				for tex in _preset.new_textures.grass_sprites:
-					if tex == null or tex.get_class() == "Texture2D":
+				for i_grass_text in range(_preset.new_textures.grass_sprites.size()):
+					var tex : Texture2D = _preset.new_textures.grass_sprites[i_grass_text]
+					if tex == null:
 						continue
-					match _preset.new_textures.grass_sprites.find(tex):
+					match i_grass_text:
 						0:
 							current_terrain_node.grass_sprite = tex
 						1:
@@ -981,8 +985,11 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 						5:
 							current_terrain_node.grass_sprite_tex_6 = tex
 			2: # grass_colors
-				for col in _preset.new_textures.grass_colors:
-					match _preset.new_textures.grass_colors.find(col):
+				for i_grass_col in range(_preset.new_textures.grass_colors.size()):
+					var col: Color = _preset.new_textures.grass_colors[i_grass_col]
+					if col == null:
+						continue
+					match i_grass_col:
 						0:
 							current_terrain_node.ground_color = col
 						1:
@@ -996,8 +1003,9 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 						5:
 							current_terrain_node.ground_color_6 = col
 			3: # has_grass
-				for val in _preset.new_textures.has_grass:
-					match _preset.new_textures.has_grass.find(val):
+				for i_has_grass in range(_preset.new_textures.has_grass.size()):
+					var val: bool = _preset.new_textures.has_grass[i_has_grass]
+					match i_has_grass:
 						0:
 							current_terrain_node.tex2_has_grass = val
 						1:
@@ -1009,10 +1017,11 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 						4:
 							current_terrain_node.tex6_has_grass = val
 			4: # wall_textures
-				for tex in _preset.new_textures.wall_textures:
-					if tex == null or tex.get_class() == "Texture2D":
+				for i_wall_text in range(_preset.new_textures.wall_textures.size()):
+					var tex: Texture2D = _preset.new_textures.wall_textures[i_wall_text]
+					if tex == null:
 						continue
-					match _preset.new_textures.wall_textures.find(tex):
+					match i_wall_text:
 						0:
 							current_terrain_node.wall_texture = tex
 						1:
@@ -1026,8 +1035,9 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 						5:
 							current_terrain_node.wall_texture_6 = tex
 			5: # wall_colors
-				for col in _preset.new_textures.wall_colors:
-					match _preset.new_textures.wall_colors.find(col):
+				for i_wall_col in range(_preset.new_textures.wall_colors.size()):
+					var col = _preset.new_textures.wall_colors[i_wall_col]
+					match i_wall_col:
 						0:
 							current_terrain_node.wall_color = col
 						1:
@@ -1043,6 +1053,11 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 	
 	vp_texture_names.floor_texture_names = _preset.new_tex_names.floor_texture_names
 	vp_texture_names.wall_texture_names = _preset.new_tex_names.wall_texture_names
+
+	#Ensure the Editor is updated live (trick it to redraw - There might be an easier way but this works)
+	EditorInterface.inspect_object(current_terrain_node)
+	current_terrain_node.is_batch_updating = true
+	current_terrain_node.force_batch_update()
 
 
 func get_cell_normal(chunk: MarchingSquaresTerrainChunk, cell: Vector2i) -> Vector3:

@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="MarchingSquaresTexturePreset" load_steps=18 format=3 uid="uid://cgvr4py0vmi3y"]
+
+[ext_resource type="Script" uid="uid://dqeuj3gddfm65" path="res://addons/MarchingSquaresTerrain/editor/tools/scripts/marching_squares_texture_names.gd" id="1_e025e"]
+[ext_resource type="Texture2D" uid="uid://dbnc04k3n0sro" path="res://addons/MarchingSquaresTerrain/resources/materials/grass_terrain_noise.res" id="2_5jkvk"]
+[ext_resource type="Texture2D" uid="uid://chwdgsfwrgw8t" path="res://addons/MarchingSquaresTerrain/resources/test textures/Water_11.png" id="3_4xvq6"]
+[ext_resource type="Texture2D" uid="uid://cxvnfgy865wsk" path="res://addons/MarchingSquaresTerrain/resources/materials/grass_leaf_sprite.png" id="3_djevs"]
+[ext_resource type="Script" uid="uid://c5yuywww81uee" path="res://addons/MarchingSquaresTerrain/editor/tools/scripts/marching_squares_texture_list.gd" id="4_4iexh"]
+[ext_resource type="Texture2D" uid="uid://qxf105jxg361" path="res://addons/MarchingSquaresTerrain/resources/test textures/Cobblestones_01_Green_1.png" id="4_wm471"]
+[ext_resource type="Texture2D" uid="uid://cxml760dk2bjv" path="res://addons/MarchingSquaresTerrain/resources/test textures/Cobblestones_01_Grey_1.png" id="5_4s4i7"]
+[ext_resource type="Texture2D" uid="uid://cv87twjgbqq0s" path="res://addons/MarchingSquaresTerrain/resources/materials/wall_noise_texture.res" id="5_sg1gx"]
+[ext_resource type="Texture2D" uid="uid://ck7mto1uqhcsn" path="res://addons/MarchingSquaresTerrain/resources/test textures/Dirt_Cracked_02_Yellow_1.png" id="6_hs5y2"]
+[ext_resource type="Script" uid="uid://fvb3vi413siv" path="res://addons/MarchingSquaresTerrain/editor/tools/scripts/marching_squares_texture_preset.gd" id="6_pefgl"]
+[ext_resource type="Texture2D" uid="uid://brx5svjnblr1x" path="res://addons/MarchingSquaresTerrain/resources/test textures/Grass_1.png" id="7_6m28m"]
+[ext_resource type="Texture2D" uid="uid://c8x54kjuedge0" path="res://addons/MarchingSquaresTerrain/resources/test textures/Grass_02_Green_2.png" id="8_wmqd1"]
+[ext_resource type="Texture2D" uid="uid://bi172ltfvl75x" path="res://addons/MarchingSquaresTerrain/resources/test textures/ice_1.png" id="9_eitor"]
+[ext_resource type="Texture2D" uid="uid://dgne8ynx4f4jj" path="res://addons/MarchingSquaresTerrain/resources/test textures/Snow_02_White_1.png" id="10_s6lbc"]
+[ext_resource type="Texture2D" uid="uid://drx2jv4ifooke" path="res://addons/MarchingSquaresTerrain/resources/test textures/Soil_1.png" id="11_j4vqi"]
+
+[sub_resource type="Resource" id="Resource_4dj7t"]
+script = ExtResource("1_e025e")
+
+[sub_resource type="Resource" id="Resource_s6lbc"]
+script = ExtResource("4_4iexh")
+floor_textures = Array[Texture2D]([ExtResource("2_5jkvk"), ExtResource("2_5jkvk"), ExtResource("2_5jkvk"), ExtResource("2_5jkvk"), ExtResource("2_5jkvk"), ExtResource("2_5jkvk"), ExtResource("3_4xvq6"), ExtResource("11_j4vqi"), ExtResource("10_s6lbc"), ExtResource("9_eitor"), ExtResource("8_wmqd1"), ExtResource("7_6m28m"), ExtResource("6_hs5y2"), ExtResource("5_4s4i7"), ExtResource("4_wm471")])
+grass_colors = Array[Color]([Color(0.57473266, 0.356755, 0.51052165, 1), Color(0.6665325, 0.31211013, 0.34447417, 1), Color(0.61760867, 0.28935716, 0.22222966, 1), Color(0.9522746, 0.4120078, 0.49901813, 1), Color(0.7254902, 0.2509804, 0.15686275, 1), Color(0.82939607, 0.5878872, 0.640586, 1)])
+has_grass = Array[bool]([false, true, false, true, true])
+wall_colors = Array[Color]([Color(0.67722255, 0.634693, 0.30034953, 1), Color(0.8940775, 0.76397324, 0.39299145, 1), Color(0.7144203, 0.5056965, 0.12118269, 1), Color(0.597069, 0.5135454, 0.32532114, 1), Color(0.79607844, 0.7882353, 0, 1), Color(0.85956055, 0.630361, 0.23721382, 1)])
+
+[resource]
+script = ExtResource("6_pefgl")
+preset_name = "BiomesRedYellow"
+new_tex_names = SubResource("Resource_4dj7t")
+new_textures = SubResource("Resource_s6lbc")
+metadata/_custom_type_script = "uid://fvb3vi413siv"
