@@ -99,6 +99,7 @@ func add_texture_settings() -> void:
 	
 	var vbox = VBoxContainer.new()
 	vbox.set_custom_minimum_size(Vector2(150, 0))
+	# Floor textures loop (15 slots)
 	for i in range(15):
 		var label := Label.new()
 		label.set_text("Texture " + str(i+1))
@@ -189,7 +190,7 @@ func add_texture_settings() -> void:
 		c_cont.set_custom_minimum_size(Vector2(50, 25))
 		c_cont.add_child(label, true)
 		vbox.add_child(c_cont, true)
-
+		
 		# Wall texture picker
 		var wall_tex : Texture2D = terrain.get(WALL_VAR_NAMES[i].get("tex_var"))
 		# Skip empty/abstract Texture2D objects
@@ -218,6 +219,11 @@ func add_texture_settings() -> void:
 		vbox.add_child(c_cont_2, true)
 		
 		vbox.add_child(HSeparator.new())
+	
+	vbox.add_child(VSeparator.new(), true)
+	var export_button = MarchingSquaresTexturePresetExporter.new()
+	vbox.add_child(export_button, true)
+	vbox.add_child(VSeparator.new(), true)
 	
 	add_child(vbox, true)
 

@@ -946,11 +946,11 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 	for i in range(6): # The range is 6 because MarchingSquaresTextureList currently has 6 export variables
 		match i:
 			0: # floor_textures
-				for i_floor_text in range(_preset.new_textures.floor_textures.size()):
-					var tex: Texture2D = _preset.new_textures.floor_textures[i_floor_text]
+				for i_floor_tex in range(_preset.new_textures.floor_textures.size()):
+					var tex : Texture2D = _preset.new_textures.floor_textures[i_floor_tex]
 					if tex == null:
 						continue
-					match i_floor_text:
+					match i_floor_tex:
 						0:
 							current_terrain_node.ground_texture = tex
 						1:
@@ -982,11 +982,11 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 						14: #Are we not adding 14 cause texture_15 is used for VOID? -> COMMENT (YUGEN): yes, void should stay void in all scenarios
 							current_terrain_node.texture_15 = tex
 			1: # grass_sprites
-				for i_grass_text in range(_preset.new_textures.grass_sprites.size()):
-					var tex : Texture2D = _preset.new_textures.grass_sprites[i_grass_text]
+				for i_grass_tex in range(_preset.new_textures.grass_sprites.size()):
+					var tex : Texture2D = _preset.new_textures.grass_sprites[i_grass_tex]
 					if tex == null:
 						continue
-					match i_grass_text:
+					match i_grass_tex:
 						0:
 							current_terrain_node.grass_sprite = tex
 						1:
@@ -1001,7 +1001,7 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 							current_terrain_node.grass_sprite_tex_6 = tex
 			2: # grass_colors
 				for i_grass_col in range(_preset.new_textures.grass_colors.size()):
-					var col: Color = _preset.new_textures.grass_colors[i_grass_col]
+					var col : Color = _preset.new_textures.grass_colors[i_grass_col]
 					if col == null:
 						continue
 					match i_grass_col:
@@ -1019,7 +1019,7 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 							current_terrain_node.ground_color_6 = col
 			3: # has_grass
 				for i_has_grass in range(_preset.new_textures.has_grass.size()):
-					var val: bool = _preset.new_textures.has_grass[i_has_grass]
+					var val : bool = _preset.new_textures.has_grass[i_has_grass]
 					match i_has_grass:
 						0:
 							current_terrain_node.tex2_has_grass = val
@@ -1032,11 +1032,11 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 						4:
 							current_terrain_node.tex6_has_grass = val
 			4: # wall_textures
-				for i_wall_text in range(_preset.new_textures.wall_textures.size()):
-					var tex: Texture2D = _preset.new_textures.wall_textures[i_wall_text]
+				for i_wall_tex in range(_preset.new_textures.wall_textures.size()):
+					var tex : Texture2D = _preset.new_textures.wall_textures[i_wall_tex]
 					if tex == null:
 						continue
-					match i_wall_text:
+					match i_wall_tex:
 						0:
 							current_terrain_node.wall_texture = tex
 						1:
@@ -1051,7 +1051,7 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 							current_terrain_node.wall_texture_6 = tex
 			5: # wall_colors
 				for i_wall_col in range(_preset.new_textures.wall_colors.size()):
-					var col = _preset.new_textures.wall_colors[i_wall_col]
+					var col : Color = _preset.new_textures.wall_colors[i_wall_col]
 					match i_wall_col:
 						0:
 							current_terrain_node.wall_color = col
