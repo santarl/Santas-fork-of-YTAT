@@ -61,6 +61,8 @@ var flatten : bool = true
 var falloff : bool = true
 
 var should_mask_grass : bool = false
+var symmetry_x : bool = false
+var symmetry_z : bool = false
 
 var vertex_color_idx : int = 0:
 	set(value):
