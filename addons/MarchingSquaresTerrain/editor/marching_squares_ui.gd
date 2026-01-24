@@ -135,9 +135,6 @@ func _on_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 		"symmetry_z":
 			if p_value is bool:
 				plugin.symmetry_z = p_value
-		"symmetry_pivot":
-			if p_value is NodePath:
-				plugin.symmetry_pivot_path = p_value
 		"material": # Vertex paint setting
 			if p_value is int:
 				plugin.vertex_color_idx = p_value

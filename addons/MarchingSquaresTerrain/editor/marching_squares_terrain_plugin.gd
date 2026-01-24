@@ -61,9 +61,16 @@ var flatten : bool = true
 var falloff : bool = true
 
 var should_mask_grass : bool = false
-var symmetry_x : bool = false
-var symmetry_z : bool = false
-var symmetry_pivot_path : NodePath
+var symmetry_x : bool = false:
+	set(value):
+		symmetry_x = value
+		if value:
+			_ensure_symmetry_axis()
+var symmetry_z : bool = false:
+	set(value):
+		symmetry_z = value
+		if value:
+			_ensure_symmetry_axis()
 
 var vertex_color_idx : int = 0:
 	set(value):
@@ -101,6 +108,21 @@ const BRUSH_VISUAL : Mesh = preload("res://addons/MarchingSquaresTerrain/resourc
 var BRUSH_RADIUS_VISUAL : Mesh = preload("res://addons/MarchingSquaresTerrain/resources/materials/round_brush_radius_visual.tres")
 var BRUSH_RADIUS_MATERIAL : ShaderMaterial = preload("res://addons/MarchingSquaresTerrain/resources/materials/round_brush_radius_material.tres")
 @onready var falloff_curve : Curve = preload("res://addons/MarchingSquaresTerrain/resources/materials/curve_falloff.tres")
+
+
+func _ensure_symmetry_axis() -> void:
+	if not current_terrain_node:
+		return
+	
+	var axis_node = current_terrain_node.find_child("SymmetryAxis")
+	if not axis_node:
+		axis_node = Marker3D.new()
+		axis_node.name = "SymmetryAxis"
+		current_terrain_node.add_child(axis_node)
+		if current_terrain_node.owner:
+			axis_node.owner = current_terrain_node.owner
+		else:
+			axis_node.owner = current_terrain_node
 
 
 func _enter_tree():

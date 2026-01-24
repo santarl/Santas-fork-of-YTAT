@@ -91,8 +91,8 @@ func show_tool_attributes(tool_index: int) -> void:
 		new_attributes.append(attribute_list.mask_mode)
 	if tool_attributes.symmetry_x or tool_attributes.symmetry_z:
 		new_attributes.append(attribute_list.symmetry)
-	if tool_attributes.symmetry_pivot:
-		new_attributes.append(attribute_list.symmetry_pivot)
+
+
 	if tool_attributes.material:
 		new_attributes.append(attribute_list.material)
 	if tool_attributes.texture_name:
@@ -461,8 +461,6 @@ func _get_setting_value(p_setting_name: String) -> Variant:
 			return plugin.symmetry_x
 		"symmetry_z":
 			return plugin.symmetry_z
-		"symmetry_pivot":
-			return plugin.symmetry_pivot_path
 		"material":
 			return plugin.vertex_color_idx
 		"texture_name":

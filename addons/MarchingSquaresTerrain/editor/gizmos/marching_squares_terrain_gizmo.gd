@@ -80,35 +80,33 @@ func _redraw():
 	var terrain_chunk_hovered: bool = terrain_plugin.terrain_hovered and terrain_system.chunks.has(terrain_plugin.current_hovered_chunk)
 	
 	if terrain_chunk_hovered:
-		var pivot_node = null
-		if terrain_plugin.symmetry_pivot_path and not terrain_plugin.symmetry_pivot_path.is_empty():
-			pivot_node = terrain_system.get_node_or_null(terrain_plugin.symmetry_pivot_path)
+		var pivot_node = terrain_system.find_child("SymmetryAxis")
 
 		var brush_positions: Array[Vector3] = [pos]
-			if terrain_plugin.symmetry_x:
-				var current_size = brush_positions.size()
-				for i in range(current_size):
-					var p = brush_positions[i]
-					if pivot_node:
-						var p_global = terrain_system.to_global(p)
-						var p_pivot = pivot_node.to_local(p_global)
-						p_pivot.x = -p_pivot.x
-						var p_mirrored_global = pivot_node.to_global(p_pivot)
-						brush_positions.append(terrain_system.to_local(p_mirrored_global))
-					else:
-						brush_positions.append(Vector3(-p.x, p.y, p.z))
-			if terrain_plugin.symmetry_z:
-				var current_size = brush_positions.size()
-				for i in range(current_size):
-					var p = brush_positions[i]
-					if pivot_node:
-						var p_global = terrain_system.to_global(p)
-						var p_pivot = pivot_node.to_local(p_global)
-						p_pivot.z = -p_pivot.z
-						var p_mirrored_global = pivot_node.to_global(p_pivot)
-						brush_positions.append(terrain_system.to_local(p_mirrored_global))
-					else:
-						brush_positions.append(Vector3(p.x, p.y, -p.z))
+		if terrain_plugin.symmetry_x:
+			var current_size = brush_positions.size()
+			for i in range(current_size):
+				var p = brush_positions[i]
+				if pivot_node:
+					var p_global = terrain_system.to_global(p)
+					var p_pivot = pivot_node.to_local(p_global)
+					p_pivot.x = -p_pivot.x
+					var p_mirrored_global = pivot_node.to_global(p_pivot)
+					brush_positions.append(terrain_system.to_local(p_mirrored_global))
+				else:
+					brush_positions.append(Vector3(-p.x, p.y, p.z))
+		if terrain_plugin.symmetry_z:
+			var current_size = brush_positions.size()
+			for i in range(current_size):
+				var p = brush_positions[i]
+				if pivot_node:
+					var p_global = terrain_system.to_global(p)
+					var p_pivot = pivot_node.to_local(p_global)
+					p_pivot.z = -p_pivot.z
+					var p_mirrored_global = pivot_node.to_global(p_pivot)
+					brush_positions.append(terrain_system.to_local(p_mirrored_global))
+				else:
+					brush_positions.append(Vector3(p.x, p.y, -p.z))
 		
 		# Remove duplicates if any (e.g. if close to 0,0,0) - though simple appending is likely fine for this use case as long as performance is okay.
 		

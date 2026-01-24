@@ -73,12 +73,6 @@ var symmetry : Dictionary = {
 	]
 }
 
-var symmetry_pivot : Dictionary = {
-	"name": "symmetry_pivot",
-	"type": "node_picker",
-	"label": "Pivot",
-}
-
 var vp_tex_names : MarchingSquaresTextureNames = preload("res://addons/MarchingSquaresTerrain/resources/texture_names.tres")
 
 var material : Dictionary = {

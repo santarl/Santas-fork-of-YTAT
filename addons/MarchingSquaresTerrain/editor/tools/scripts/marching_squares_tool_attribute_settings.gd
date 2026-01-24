@@ -12,9 +12,8 @@ class_name MarchingSquaresToolAttributeSettings
 
 # Brush specific attributes
 @export var mask_mode : bool = false
-@export var symmetry_x : bool = true
-@export var symmetry_z : bool = true
-@export var symmetry_pivot : bool = true
+@export var symmetry_x : bool = false
+@export var symmetry_z : bool = false
 @export var material : bool = false
 @export var texture_name : bool = false
 

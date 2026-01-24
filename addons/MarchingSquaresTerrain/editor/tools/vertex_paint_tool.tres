@@ -8,6 +8,8 @@
 script = ExtResource("1_rbatu")
 brush_type = true
 size = true
+symmetry_x = true
+symmetry_z = true
 material = true
 texture_name = true
 metadata/_custom_type_script = "uid://b6jopat61dbd3"
