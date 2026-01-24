@@ -63,6 +63,20 @@ var mask_mode : Dictionary = {
 	"default": true,
 }
 
+var symmetry_x : Dictionary = {
+	"name": "symmetry_x",
+	"type": "checkbox",
+	"label": "Symmetry X",
+	"default": false,
+}
+
+var symmetry_z : Dictionary = {
+	"name": "symmetry_z",
+	"type": "checkbox",
+	"label": "Symmetry Z",
+	"default": false,
+}
+
 var vp_tex_names : MarchingSquaresTextureNames = preload("res://addons/MarchingSquaresTerrain/resources/texture_names.tres")
 
 var material : Dictionary = {

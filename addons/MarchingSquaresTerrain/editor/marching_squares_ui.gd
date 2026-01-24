@@ -129,6 +129,12 @@ func _on_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 		"mask_mode": # Grass mask mode
 			if p_value is bool:
 				plugin.should_mask_grass = p_value
+		"symmetry_x":
+			if p_value is bool:
+				plugin.symmetry_x = p_value
+		"symmetry_z":
+			if p_value is bool:
+				plugin.symmetry_z = p_value
 		"material": # Vertex paint setting
 			if p_value is int:
 				plugin.vertex_color_idx = p_value

@@ -85,6 +85,10 @@ func show_tool_attributes(tool_index: int) -> void:
 		new_attributes.append(attribute_list.falloff)
 	if tool_attributes.mask_mode:
 		new_attributes.append(attribute_list.mask_mode)
+	if tool_attributes.symmetry_x:
+		new_attributes.append(attribute_list.symmetry_x)
+	if tool_attributes.symmetry_z:
+		new_attributes.append(attribute_list.symmetry_z)
 	if tool_attributes.material:
 		new_attributes.append(attribute_list.material)
 	if tool_attributes.texture_name:
@@ -386,6 +390,10 @@ func _get_setting_value(p_setting_name: String) -> Variant:
 			return plugin.falloff
 		"mask_mode":
 			return plugin.should_mask_grass
+		"symmetry_x":
+			return plugin.symmetry_x
+		"symmetry_z":
+			return plugin.symmetry_z
 		"material":
 			return plugin.vertex_color_idx
 		"texture_name":
