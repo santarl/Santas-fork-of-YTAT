@@ -86,12 +86,14 @@ func _on_tool_changed(tool_index: int) -> void:
 		tool_attributes.attribute_list = MarchingSquaresToolAttributesList.new()
 		texture_settings.show()
 		texture_settings.add_texture_settings()
-		
+
 	else:
 		texture_settings.hide()
 	if tool_index == 3: # Bridge tool
 		plugin.falloff = false
 		plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_visible", false)
+
+
 	plugin.active_tool = tool_index
 	plugin.mode = tool_index
 	tool_attributes.show_tool_attributes(active_tool)
@@ -186,6 +188,7 @@ func _on_terrain_setting_changed(p_setting_name: String, p_value: Variant) -> vo
 		"use_ridge_texture":
 			if p_value is bool:
 				terrain.use_ridge_texture = p_value
+
 
 
 func _on_texture_setting_changed(p_setting_name: String, p_value: Variant) -> void:

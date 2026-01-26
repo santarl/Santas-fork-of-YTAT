@@ -38,6 +38,10 @@ var plugin : MarchingSquaresTerrainPlugin
 var attribute_list : MarchingSquaresToolAttributesList
 var settings : Dictionary = {}
 
+# Variables to store chunk mode and selected chunk type values
+var chunk_mode_value : int = 0  # 0 = Create/Delete, 1 = Type Painter
+var selected_chunk_type_value : int = 1  # Default to POLYHEDRON
+
 var last_setting_type : SettingType = SettingType.ERROR
 var selected_chunk : MarchingSquaresTerrainChunk
 
@@ -48,7 +52,7 @@ func _ready() -> void:
 
 func show_tool_attributes(tool_index: int) -> void:
 	set_custom_minimum_size(Vector2(0, 35))
-	
+
 	if not visible:
 		return
 
@@ -71,6 +75,46 @@ func show_tool_attributes(tool_index: int) -> void:
 		"chunk": SettingType.CHUNK,
 		"terrain": SettingType.TERRAIN,
 	}
+
+	# Special handling for chunk management tool - add mode selector
+	if tool_index == 7:  # CHUNK_MANAGEMENT
+		# Add mode selector first
+		var mode_label = Label.new()
+		mode_label.text = "Mode:"
+		mode_label.set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER)
+		mode_label.set_custom_minimum_size(Vector2(50, 25))
+
+		var label_container = CenterContainer.new()
+		label_container.set_custom_minimum_size(Vector2(50, 35))
+		label_container.add_child(mode_label, true)
+
+		# Create the mode selector dropdown
+		var mode_dropdown = OptionButton.new()
+		mode_dropdown.add_item("Create/Delete")
+		mode_dropdown.add_item("Type Painter")
+		mode_dropdown.set_flat(true)
+		mode_dropdown.set_custom_minimum_size(Vector2(120, 35))
+
+		# Connect the selection change to update the plugin's mode
+		mode_dropdown.item_selected.connect(func(index):
+			plugin.chunk_manager_mode = index
+		)
+
+		# Add the controls to the tool attributes panel
+		var container = CenterContainer.new()
+		container.set_custom_minimum_size(Vector2(120, 35))
+		container.add_child(mode_dropdown, true)
+
+		# Add a separator for visual distinction
+		var separator = VSeparator.new()
+
+		# Insert the controls at the top of the tool attributes panel
+		add_child(separator, true)
+		add_child(label_container, true)
+		add_child(container, true)
+
+		# Add another separator to separate mode selector from other controls
+		add_child(VSeparator.new(), true)
 
 	var new_attributes := []
 	if tool_attributes.brush_type:
@@ -262,11 +306,18 @@ func add_setting(p_params: Dictionary) -> void:
 			if saved_setting_value is not String and str(saved_setting_value) != "ERROR":
 				default_value = saved_setting_value
 			option_button.selected = default_value
-			
+
 			option_button.set_flat(true)
-			option_button.item_selected.connect(func(index): _on_setting_changed(setting_name, index))
+			if setting_name == "chunk_mode":
+				# Special handling for chunk mode to update the chunk_mode_value
+				option_button.item_selected.connect(func(index):
+					_on_setting_changed(setting_name, index)
+					update_chunk_mode(index)
+				)
+			else:
+				option_button.item_selected.connect(func(index): _on_setting_changed(setting_name, index))
 			option_button.set_custom_minimum_size(Vector2(65, 35))
-			
+
 			cont = CenterContainer.new()
 			cont.set_custom_minimum_size(Vector2(65, 35))
 			cont.add_child(option_button, true)
@@ -301,20 +352,28 @@ func add_setting(p_params: Dictionary) -> void:
 				option_button.add_item(mode)
 			option_button.selected = 1 # Fallback base value
 			option_button.selected = selected_chunk.merge_mode
-			option_button.item_selected.connect(_on_chunk_mode_changed)
-			
+			# Update the selected chunk type value when the dropdown changes
+			option_button.item_selected.connect(func(index):
+				_on_chunk_mode_changed(index)
+				update_selected_chunk_type(index)
+
+				# Also update the plugin's selected chunk type value for the type painter mode
+				if plugin:
+					plugin.selected_chunk_type_for_painting = index
+			)
+
 			chunk_button.set_flat(true)
 			chunk_button.item_selected.connect(func(chunk): _on_chunk_selected(option_button, chunk_button.get_item_text(chunk)))
 			chunk_button.set_custom_minimum_size(Vector2(65, 35))
-			
+
 			cont = CenterContainer.new()
 			cont.set_custom_minimum_size(Vector2(65, 35))
 			cont.add_child(chunk_button, true)
 			add_child(cont, true)
-			
+
 			var v_sep := VSeparator.new()
 			add_child(v_sep, true)
-			
+
 			cont = CenterContainer.new()
 			cont.set_custom_minimum_size(Vector2(65, 35))
 			cont.add_child(option_button, true)
@@ -467,6 +526,12 @@ func _get_setting_value(p_setting_name: String) -> Variant:
 			pass
 		"chunk_management":
 			pass
+		"chunk_mode":
+			return chunk_mode_value
+		"selected_chunk_type":
+			# Return the selected chunk type from the chunk management dropdown
+			# This will need to be stored when the user selects a type in the UI
+			return selected_chunk_type_value
 		"terrain_settings":
 			pass
 		_:
@@ -502,6 +567,9 @@ func _on_chunk_mode_changed(m_mode: int) -> void:
 			selected_chunk.merge_mode = MarchingSquaresTerrainChunk.Mode.SEMI_ROUND
 		"SPHERICAL":
 			selected_chunk.merge_mode = MarchingSquaresTerrainChunk.Mode.SPHERICAL
+
+	# Update the selected chunk type value for the type painter mode
+	update_selected_chunk_type(m_mode)
 
 
 func _make_vector_editor(type: String, value: Variant, setting_name: String) -> HBoxContainer:
@@ -563,6 +631,16 @@ func _make_editor_name(var_name: String) -> String:
 	for word in loose_words:
 		loose_words[loose_words.find(word)] = word.capitalize()
 	return " ".join(loose_words)
+
+
+# Method to update the selected chunk type value
+func update_selected_chunk_type(value: int) -> void:
+	selected_chunk_type_value = value
+
+
+# Method to update the chunk mode value
+func update_chunk_mode(value: int) -> void:
+	chunk_mode_value = value
 
 
 func _hide_textures(texture_node: Node) -> void:

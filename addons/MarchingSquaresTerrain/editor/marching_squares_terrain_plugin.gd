@@ -89,6 +89,12 @@ var terrain_hovered : bool
 # True if the mouse is currently held down to draw
 var is_drawing : bool
 
+# Chunk manager mode (0 = Create/Delete, 1 = Type Painter)
+var chunk_manager_mode : int = 0
+
+# Selected chunk type for painting (used in Type Painter mode)
+var selected_chunk_type_for_painting : int = 1  # Default to POLYHEDRON
+
 # when brush draws, if the gizmo sees draw height is not set, it will set the draw height
 var draw_height_set : bool
 
@@ -392,26 +398,44 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 		current_hovered_chunk = chunk_coords
 		is_chunk_plane_hovered = true
 	
-		# On click, add or remove chunk if in chunk_management mode
+		# Handle chunk management based on selected mode
 		if mode == TerrainToolMode.CHUNK_MANAGEMENT and event is InputEventMouseButton and event.is_pressed() and event.button_index == MouseButton.MOUSE_BUTTON_LEFT:
-			# Remove chunk
-			if chunk:
-				var removed_chunk = terrain.chunks[chunk_coords]
-				get_undo_redo().create_action("remove chunk")
-				get_undo_redo().add_do_method(terrain, "remove_chunk_from_tree", chunk_x, chunk_z)
-				get_undo_redo().add_undo_method(terrain, "add_chunk", chunk_coords, removed_chunk)
-				get_undo_redo().commit_action()
-				return EditorPlugin.AFTER_GUI_INPUT_STOP
-			
-			# Add new chunk
-			elif not chunk:
-				# Can add a new chunk here if there is a neighbouring non-empty chunk
-				# also add if there are no chunks at all in the current terrain system
-				var can_add_empty: bool = terrain.chunks.is_empty() or terrain.has_chunk(chunk_x-1, chunk_z) or terrain.has_chunk(chunk_x+1, chunk_z) or terrain.has_chunk(chunk_x, chunk_z-1) or terrain.has_chunk(chunk_x, chunk_z+1)
-				if can_add_empty:
-					get_undo_redo().create_action("add chunk")
-					get_undo_redo().add_do_method(terrain, "add_new_chunk", chunk_x, chunk_z)
-					get_undo_redo().add_undo_method(terrain, "remove_chunk", chunk_x, chunk_z)
+			# Get the current mode (0 = Create/Delete, 1 = Type Painter)
+			var chunk_mode = chunk_manager_mode
+
+			if chunk_mode == 0:  # Create/Delete mode
+				# Remove chunk
+				if chunk:
+					var removed_chunk = terrain.chunks[chunk_coords]
+					get_undo_redo().create_action("remove chunk")
+					get_undo_redo().add_do_method(terrain, "remove_chunk_from_tree", chunk_x, chunk_z)
+					get_undo_redo().add_undo_method(terrain, "add_chunk", chunk_coords, removed_chunk)
+					get_undo_redo().commit_action()
+					return EditorPlugin.AFTER_GUI_INPUT_STOP
+
+				# Add new chunk
+				elif not chunk:
+					# Can add a new chunk here if there is a neighbouring non-empty chunk
+					# also add if there are no chunks at all in the current terrain system
+					var can_add_empty: bool = terrain.chunks.is_empty() or terrain.has_chunk(chunk_x-1, chunk_z) or terrain.has_chunk(chunk_x+1, chunk_z) or terrain.has_chunk(chunk_x, chunk_z-1) or terrain.has_chunk(chunk_x, chunk_z+1)
+					if can_add_empty:
+						get_undo_redo().create_action("add chunk")
+						get_undo_redo().add_do_method(terrain, "add_new_chunk", chunk_x, chunk_z)
+						get_undo_redo().add_undo_method(terrain, "remove_chunk", chunk_x, chunk_z)
+						get_undo_redo().commit_action()
+						return EditorPlugin.AFTER_GUI_INPUT_STOP
+
+			elif chunk_mode == 1:  # Type Painter mode
+				# Paint chunk type to the clicked chunk
+				if chunk:
+					# Use the selected chunk type for painting
+					var selected_chunk_type = selected_chunk_type_for_painting
+
+					# Change the chunk's merge mode to the selected type
+					var old_mode = chunk.merge_mode
+					get_undo_redo().create_action("paint chunk type")
+					get_undo_redo().add_do_method(chunk, "set", "merge_mode", selected_chunk_type)
+					get_undo_redo().add_undo_method(chunk, "set", "merge_mode", old_mode)
 					get_undo_redo().commit_action()
 					return EditorPlugin.AFTER_GUI_INPUT_STOP
 		
@@ -718,19 +742,26 @@ func _set_vertex_colors(vc_idx: int) -> void:
 
 func get_cell_normal(chunk: MarchingSquaresTerrainChunk, cell: Vector2i) -> Vector3:
 	var h_c := chunk.get_height(cell)
-	
+
 	var x0 := max(cell.x - 1, 0)
 	var x1 := min(cell.x + 1, chunk.dimensions.x - 1)
 	var y0 := max(cell.y - 1, 0)
 	var y1 := min(cell.y + 1, chunk.dimensions.y - 1)
-	
+
 	var h_left := chunk.get_height(Vector2i(x0, cell.y))
 	var h_right := chunk.get_height(Vector2i(x1, cell.y))
 	var h_below := chunk.get_height(Vector2i(cell.x, y0))
 	var h_above := chunk.get_height(Vector2i(cell.x, y1))
-	
+
 	var sx := (h_right - h_left) / (2.0 * current_terrain_node.cell_size.x)
 	var sz := (h_above - h_below) / (2.0 * current_terrain_node.cell_size.y)
-	
+
 	var normal := Vector3(-sx, 1.0, -sz).normalized()
 	return normal
+
+
+# Get the value of a tool attribute
+func get_attribute_value(attribute_name: String, default_value: Variant) -> Variant:
+	if tool_attributes:
+		return tool_attributes.get_attribute_value(attribute_name, default_value)
+	return default_value
