@@ -45,6 +45,9 @@ var selected_chunk_type_value : int = 1  # Default to POLYHEDRON
 var last_setting_type : SettingType = SettingType.ERROR
 var selected_chunk : MarchingSquaresTerrainChunk
 
+# Reference to the Apply to All button for updating visibility
+var _apply_all_button : Button
+
 func _ready() -> void:
 	set_custom_minimum_size(Vector2(0, 35))
 	add_theme_constant_override("separation", 5)
@@ -98,6 +101,9 @@ func show_tool_attributes(tool_index: int) -> void:
 		# Connect the selection change to update the plugin's mode
 		mode_dropdown.item_selected.connect(func(index):
 			plugin.chunk_manager_mode = index
+			# Update the visibility of the Apply to All button when mode changes
+			if is_instance_valid(self):
+				update_apply_to_all_button_visibility()
 		)
 
 		# Add the controls to the tool attributes panel
@@ -115,6 +121,10 @@ func show_tool_attributes(tool_index: int) -> void:
 
 		# Add another separator to separate mode selector from other controls
 		add_child(VSeparator.new(), true)
+
+		# Update the visibility of the Apply to All button when showing tool attributes
+		if is_instance_valid(self):
+			update_apply_to_all_button_visibility()
 
 	var new_attributes := []
 	if tool_attributes.brush_type:
@@ -378,6 +388,27 @@ func add_setting(p_params: Dictionary) -> void:
 			cont.set_custom_minimum_size(Vector2(65, 35))
 			cont.add_child(option_button, true)
 			add_child(cont, true)
+
+			# Add Apply to All button for Type Painter mode
+			var apply_all_button := Button.new()
+			apply_all_button.text = "Apply to All"
+			apply_all_button.set_tooltip_text("Apply the selected chunk type to all chunks in the terrain")
+			apply_all_button.set_flat(true)
+			apply_all_button.set_custom_minimum_size(Vector2(80, 35))
+
+			# Initially hide the button if not in Type Painter mode
+			apply_all_button.visible = (plugin.chunk_manager_mode == 1)
+
+			# Connect the button to apply the selected type to all chunks
+			apply_all_button.pressed.connect(func(): _apply_chunk_type_to_all(option_button.selected))
+
+			var button_container = CenterContainer.new()
+			button_container.set_custom_minimum_size(Vector2(80, 35))
+			button_container.add_child(apply_all_button, true)
+			add_child(button_container, true)
+
+			# Store reference to the button to update visibility later
+			self._apply_all_button = apply_all_button
 		SettingType.TERRAIN:
 			var vbox := VBoxContainer.new()
 			for setting in terrain_settings_data:
@@ -646,3 +677,41 @@ func update_chunk_mode(value: int) -> void:
 func _hide_textures(texture_node: Node) -> void:
 	var texture_button := texture_node.get_child(0) as Button
 	texture_button.visible = false
+
+
+# Function to apply the selected chunk type to all chunks in the terrain
+func _apply_chunk_type_to_all(selected_type: int) -> void:
+	if not plugin or not plugin.current_terrain_node:
+		printerr("ERROR: Plugin or current terrain node is not available")
+		return
+
+	var terrain = plugin.current_terrain_node
+	var chunks = terrain.get_children()
+
+	if chunks.is_empty():
+		print("No chunks to update")
+		return
+
+	# Create an undo-redo action for the entire operation
+	var undo_redo = plugin.get_undo_redo()
+	undo_redo.create_action("Apply chunk type to all chunks")
+
+	# Store old values for undo
+	var old_values = {}
+	for chunk in chunks:
+		if chunk is MarchingSquaresTerrainChunk:
+			old_values[chunk] = chunk.merge_mode
+
+	# Apply the new type to all chunks and add to undo-redo
+	for chunk in chunks:
+		if chunk is MarchingSquaresTerrainChunk:
+			undo_redo.add_do_method(chunk, "set", "merge_mode", selected_type)
+			undo_redo.add_undo_method(chunk, "set", "merge_mode", old_values[chunk])
+
+	undo_redo.commit_action()
+
+
+# Function to update the visibility of the Apply to All button based on the current mode
+func update_apply_to_all_button_visibility() -> void:
+	if _apply_all_button:
+		_apply_all_button.visible = (plugin.chunk_manager_mode == 1)
