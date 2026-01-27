@@ -308,9 +308,14 @@ func _ready() -> void:
 func _initialize_runtime() -> void:
 	_ensure_textures()
 	
+	# Pause the game to prevent physics/player from falling while generating
+	get_tree().paused = true
+	
 	# Create a temporary loading overlay
 	var overlay = CanvasLayer.new()
 	overlay.layer = 100 # Ensure it's on top
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS # Update while paused
+	
 	var color_rect = ColorRect.new()
 	color_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	color_rect.color = Color(0.1, 0.1, 0.1, 1.0)
@@ -346,28 +351,77 @@ func _initialize_runtime() -> void:
 			chunks_to_generate.append(chunk)
 	
 	var total = chunks_to_generate.size()
-	var current = 0
-	
-	# Generate chunks in batches to prevent freezing but maintain speed
-	var batch_size = 5 # Adjust based on complexity/performance
+	var completed_count = 0
+	var active_tasks: Dictionary = {} # Map task_id -> chunk
+	var pending_index = 0
+	var max_concurrent_tasks = OS.get_processor_count() - 1 # Leave 1 core for Main Thread
+	if max_concurrent_tasks < 1: max_concurrent_tasks = 1
 	
 	emit_signal("generation_progress", 0, total)
 	# Wait one frame to ensure any loading UI has a chance to appear
 	await get_tree().process_frame
 	
-	for i in range(total):
-		chunks_to_generate[i].initialize_terrain(true)
-		current += 1
+	var ui_tween: Tween
+	
+	# Loop until all chunks are completed
+	while completed_count < total:
+		# 1. Fill up active tasks
+		while active_tasks.size() < max_concurrent_tasks and pending_index < total:
+			var chunk = chunks_to_generate[pending_index]
+			# Initialize data arrays (heightmap, colors, needs_update) on main thread first
+			chunk.initialize_terrain(false) 
+			var task_id = WorkerThreadPool.add_task(chunk.calculate_mesh_threaded)
+			active_tasks[task_id] = chunk
+			pending_index += 1
 		
-		# Update UI
-		progress_bar.value = (float(current) / float(total)) * 100.0
+		# 2. Poll for completion
+		var processed_this_frame = 0
+		var max_chunks_per_frame = 1 # Keep this low to ensure high FPS on loading screen
+		var tasks_to_remove = []
 		
-		if current % batch_size == 0:
-			emit_signal("generation_progress", current, total)
-			await get_tree().process_frame
+		for task_id in active_tasks.keys():
+			if processed_this_frame >= max_chunks_per_frame:
+				break
+				
+			if WorkerThreadPool.is_task_completed(task_id):
+				WorkerThreadPool.wait_for_task_completion(task_id) # Clean up task
+				var chunk = active_tasks[task_id]
+				chunk.apply_generated_mesh() # Apply logic on main thread
+				
+				completed_count += 1
+				processed_this_frame += 1
+				tasks_to_remove.append(task_id)
+				
+				# Update UI smoothly
+				var target_value = (float(completed_count) / float(total)) * 100.0
+				if ui_tween:
+					ui_tween.kill()
+				ui_tween = create_tween()
+				ui_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS) # Run while paused
+				ui_tween.tween_property(progress_bar, "value", target_value, 0.1)
+		
+		for id in tasks_to_remove:
+			active_tasks.erase(id)
+		
+		emit_signal("generation_progress", completed_count, total)
+		await get_tree().process_frame
+	
+	if ui_tween:
+		ui_tween.kill()
+	progress_bar.value = 100.0
 	
 	emit_signal("generation_progress", total, total)
 	emit_signal("terrain_generated")
+	
+	if ui_tween:
+		ui_tween.kill()
+	progress_bar.value = 100.0
+	
+	emit_signal("generation_progress", total, total)
+	emit_signal("terrain_generated")
+	
+	# Unpause the game
+	get_tree().paused = false
 	
 	# Fade out overlay
 	var tween = create_tween()

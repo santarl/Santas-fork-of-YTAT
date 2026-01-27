@@ -10,5 +10,5 @@ curve = ExtResource("2_a4had")
 render_priority = 11
 shader = ExtResource("1_130ci")
 shader_parameter/curve_texture = SubResource("CurveTexture_fttfv")
-shader_parameter/falloff_mode = 0
+shader_parameter/falloff_mode = 2
 shader_parameter/falloff_steps = 5

@@ -68,6 +68,7 @@ var cd : bool
 
 var needs_update : Array[Array] # Stores which tiles need to be updated because one of their corners' heights was changed.
 
+var _temp_generated_mesh: ArrayMesh
 
 func _validate_property(property: Dictionary) -> void:
 	if property.name == "mesh":
@@ -84,10 +85,7 @@ func initialize_terrain(should_regenerate_mesh: bool = true):
 		for x in range(dimensions.x - 1):
 			needs_update[z].append(true)
 	
-	if not grass_planter:
-		grass_planter = get_node_or_null("GrassPlanter")
-		if grass_planter:
-			grass_planter._chunk = self
+	_ensure_grass_planter()
 	
 	if Engine.is_editor_hint() or (terrain_system and terrain_system.enable_runtime_generation):
 		if not height_map:
@@ -129,32 +127,13 @@ func regenerate_mesh():
 	
 	var start_time: int = Time.get_ticks_msec()
 	
-	if not find_child("GrassPlanter"):
-		grass_planter = get_node_or_null("GrassPlanter")
-		if not grass_planter:
-			grass_planter = GrassPlanter.new()
-			if not color_map_0 or not color_map_1:
-				generate_color_maps()
-			if not grass_mask_map:
-				generate_grass_mask_map()
-			new_chunk = true
-		grass_planter.name = "GrassPlanter"
-		add_child(grass_planter)
-		grass_planter._chunk = self
-		grass_planter.setup(self)
-		if Engine.is_editor_hint():
-			if terrain_system and not terrain_system.enable_runtime_generation:
-				grass_planter.owner = EditorInterface.get_edited_scene_root()
-			else:
-				grass_planter.owner = null # Ensure it's not saved
-		else:
-			# At runtime, owners don't need to be set for persistence, but for scene tree consistency
-			if get_tree() and get_tree().current_scene:
-				grass_planter.owner = get_tree().current_scene
-	else:
-		grass_planter._chunk = self
-		if Engine.is_editor_hint() and terrain_system and terrain_system.enable_runtime_generation:
-			grass_planter.owner = null # Ensure existing planter is depersisted
+	_ensure_grass_planter()
+	if not color_map_0 or not color_map_1:
+		generate_color_maps()
+	if not grass_mask_map:
+		generate_grass_mask_map()
+	if not new_chunk:
+		new_chunk = true # Force update if we are regenerating
 	
 	generate_terrain_cells()
 	
@@ -184,7 +163,55 @@ func regenerate_mesh():
 	print_verbose("Generated terrain in "+str(elapsed_time)+"ms")
 
 
-func generate_terrain_cells():
+# Threaded generation: Phase 1 (Worker Thread)
+func calculate_mesh_threaded() -> void:
+	st = SurfaceTool.new()
+	if mesh:
+		# We don't want to create from existing mesh in threaded mode usually, as we are regenerating fresh
+		# But to keep consistency with regenerate_mesh logic:
+		# st.create_from(mesh, 0) # This might be unsafe if mesh is being drawn.
+		pass 
+	
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_custom_format(0, SurfaceTool.CUSTOM_RGBA_FLOAT)
+	st.set_custom_format(1, SurfaceTool.CUSTOM_RGBA_FLOAT)
+	
+	# Run generation WITHOUT grass (grass touches scene tree/resources)
+	generate_terrain_cells(false)
+	
+	st.generate_normals()
+	st.index()
+	
+	_temp_generated_mesh = st.commit()
+
+
+# Threaded generation: Phase 2 (Main Thread)
+func apply_generated_mesh(new_mesh: ArrayMesh = null) -> void:
+	if new_mesh:
+		mesh = new_mesh
+	elif _temp_generated_mesh:
+		mesh = _temp_generated_mesh
+		_temp_generated_mesh = null # Clear reference
+	
+	if mesh and terrain_system:
+		mesh.surface_set_material(0, terrain_system.terrain_material)
+	
+	for child in get_children():
+		if child is StaticBody3D:
+			child.free()
+	create_trimesh_collision()
+	for child in get_children():
+		if child is StaticBody3D:
+			child.collision_layer = 17 # ground (1) + terrain (16)
+			if Engine.is_editor_hint() and terrain_system and terrain_system.enable_runtime_generation:
+				child.owner = null
+	
+	# Generate grass now that we are back on main thread
+	if grass_planter:
+		grass_planter.regenerate_all_cells()
+
+
+func generate_terrain_cells(update_grass: bool = true):
 	if not cell_geometry:
 		cell_geometry = {}
 	
@@ -268,7 +295,7 @@ func generate_terrain_cells():
 			# If all edges are connected, put a full floor here.
 			if ab and bd and cd and ac:
 				add_full_floor()
-				if grass_planter and grass_planter.terrain_system:
+				if update_grass and grass_planter and grass_planter.terrain_system:
 					grass_planter.generate_grass_on_cell(cell_coords)
 				continue
 			
@@ -559,7 +586,7 @@ func generate_terrain_cells():
 					case_found = false
 					
 				if case_found:
-					if grass_planter and grass_planter.terrain_system:
+					if update_grass and grass_planter and grass_planter.terrain_system:
 						grass_planter.generate_grass_on_cell(cell_coords)
 					break
 					
@@ -997,6 +1024,38 @@ func notify_needs_update(z: int, x: int):
 		return
 		
 	needs_update[z][x] = true
+
+
+func _ensure_grass_planter() -> void:
+	if not grass_planter:
+		grass_planter = get_node_or_null("GrassPlanter")
+	
+	if not grass_planter:
+		grass_planter = GrassPlanter.new()
+		grass_planter.name = "GrassPlanter"
+		add_child(grass_planter)
+		# No new_chunk flag logic here to keep it pure
+	
+	if grass_planter:
+		grass_planter._chunk = self
+		# Ensure parenting is correct
+		if grass_planter.get_parent() != self:
+			if grass_planter.get_parent():
+				grass_planter.reparent(self)
+			else:
+				add_child(grass_planter)
+		
+		# Setup owner for persistence only if needed
+		if Engine.is_editor_hint():
+			if terrain_system and not terrain_system.enable_runtime_generation:
+				grass_planter.owner = EditorInterface.get_edited_scene_root()
+			else:
+				grass_planter.owner = null
+		else:
+			if get_tree() and get_tree().current_scene:
+				grass_planter.owner = get_tree().current_scene
+		
+		grass_planter.setup(self)
 
 
 func regenerate_all_cells():
