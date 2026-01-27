@@ -20,7 +20,7 @@ void fragment() {
 		} else if (falloff_mode == 4) { // PLATEAU
 			sample = smoothstep(0.0, 0.2, t);
 		} else if (falloff_mode == 5) { // TERRACED
-			float steps = float(falloff_steps);
+			float steps = float(falloff_steps) + 1.0;
 			sample = floor(t * steps) / (steps - 1.0);
 		}
 		

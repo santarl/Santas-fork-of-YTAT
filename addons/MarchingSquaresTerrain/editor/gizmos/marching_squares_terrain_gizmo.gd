@@ -187,7 +187,7 @@ func _redraw():
 									4: # PLATEAU
 										sample = smoothstep(0.0, 0.2, t)
 									5: # TERRACED
-										var steps = float(terrain_plugin.falloff_steps)
+										var steps = float(terrain_plugin.falloff_steps) + 1.0
 										sample = floor(t * steps) / (steps - 1.0)
 									_:
 										sample = t
