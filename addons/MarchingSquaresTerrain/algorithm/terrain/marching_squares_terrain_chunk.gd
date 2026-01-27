@@ -198,6 +198,30 @@ func generate_terrain_cells():
 			# Cell is now being updated, set needs update to false
 			needs_update[z][x] = false
 			
+			# Check for void texture (Hole creation)
+			# If all 4 corners are void, skip generating geometry for this cell
+			var idx_tl = z * dimensions.x + x
+			var idx_tr = z * dimensions.x + x + 1
+			var idx_bl = (z + 1) * dimensions.x + x
+			var idx_br = (z + 1) * dimensions.x + x + 1
+			
+			var tl_void = color_map_0[idx_tl].a > 0.9 and color_map_1[idx_tl].a > 0.9
+			var tr_void = color_map_0[idx_tr].a > 0.9 and color_map_1[idx_tr].a > 0.9
+			var bl_void = color_map_0[idx_bl].a > 0.9 and color_map_1[idx_bl].a > 0.9
+			var br_void = color_map_0[idx_br].a > 0.9 and color_map_1[idx_br].a > 0.9
+			
+			if tl_void and tr_void and bl_void and br_void:
+				cell_geometry[cell_coords] = {
+					"verts": PackedVector3Array(),
+					"uvs": PackedVector2Array(),
+					"uv2s": PackedVector2Array(),
+					"colors_0": PackedColorArray(),
+					"colors_1": PackedColorArray(),
+					"grass_mask": PackedColorArray(),
+					"is_floor": [],
+				}
+				continue
+			
 			# If geometry did change or none exists yet, 
 			# Create an entry for this cell (will also override any existing one)
 			cell_geometry[cell_coords] = {

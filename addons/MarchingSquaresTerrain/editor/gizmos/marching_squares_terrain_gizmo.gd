@@ -22,6 +22,9 @@ func _redraw():
 	var terrain_system: MarchingSquaresTerrain = get_node_3d()
 	terrain_plugin = MarchingSquaresTerrainPlugin.instance
 	
+	if not terrain_plugin:
+		return
+	
 	# Only draw the gizmo if this is the only selected node
 	if len(EditorInterface.get_selection().get_selected_nodes()) != 1:
 		return
