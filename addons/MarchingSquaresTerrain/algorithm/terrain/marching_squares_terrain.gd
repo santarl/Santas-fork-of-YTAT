@@ -289,6 +289,7 @@ var grass_mesh : QuadMesh = preload("res://addons/MarchingSquaresTerrain/resourc
 var chunks : Dictionary = {}
 
 signal terrain_generated
+signal generation_progress(current: int, total: int)
 
 func _init() -> void:
 	if not terrain_material:
@@ -307,15 +308,72 @@ func _ready() -> void:
 func _initialize_runtime() -> void:
 	_ensure_textures()
 	
+	# Create a temporary loading overlay
+	var overlay = CanvasLayer.new()
+	overlay.layer = 100 # Ensure it's on top
+	var color_rect = ColorRect.new()
+	color_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	color_rect.color = Color(0.1, 0.1, 0.1, 1.0)
+	overlay.add_child(color_rect)
+	
+	var center_cont = CenterContainer.new()
+	center_cont.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center_cont)
+	
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 20)
+	center_cont.add_child(vbox)
+	
+	var label = Label.new()
+	label.text = "Generating Terrain..."
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(label)
+	
+	var progress_bar = ProgressBar.new()
+	progress_bar.custom_minimum_size = Vector2(300, 30)
+	progress_bar.show_percentage = true
+	vbox.add_child(progress_bar)
+	
+	add_child(overlay)
+	
 	chunks.clear()
+	var chunks_to_generate = []
 	for chunk in get_children():
 		if chunk is MarchingSquaresTerrainChunk:
 			chunks[chunk.chunk_coords] = chunk
 			chunk.terrain_system = self
 			chunk.grass_planter = null
-			chunk.initialize_terrain(true)
+			chunks_to_generate.append(chunk)
 	
+	var total = chunks_to_generate.size()
+	var current = 0
+	
+	# Generate chunks in batches to prevent freezing but maintain speed
+	var batch_size = 5 # Adjust based on complexity/performance
+	
+	emit_signal("generation_progress", 0, total)
+	# Wait one frame to ensure any loading UI has a chance to appear
+	await get_tree().process_frame
+	
+	for i in range(total):
+		chunks_to_generate[i].initialize_terrain(true)
+		current += 1
+		
+		# Update UI
+		progress_bar.value = (float(current) / float(total)) * 100.0
+		
+		if current % batch_size == 0:
+			emit_signal("generation_progress", current, total)
+			await get_tree().process_frame
+	
+	emit_signal("generation_progress", total, total)
 	emit_signal("terrain_generated")
+	
+	# Fade out overlay
+	var tween = create_tween()
+	tween.tween_property(overlay, "offset:x", 0.0, 0.5) # Dummy wait
+	tween.tween_property(color_rect, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(overlay.queue_free)
 
 
 func _enter_tree() -> void:
