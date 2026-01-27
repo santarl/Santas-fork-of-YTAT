@@ -141,6 +141,9 @@ func show_tool_attributes(tool_index: int) -> void:
 		new_attributes.append(attribute_list.flatten)
 	if tool_attributes.falloff:
 		new_attributes.append(attribute_list.falloff)
+		# Only show steps slider if mode is TERRACED (5)
+		if plugin.falloff_mode == 5:
+			new_attributes.append(attribute_list.falloff_steps)
 	if tool_attributes.mask_mode:
 		new_attributes.append(attribute_list.mask_mode)
 	if tool_attributes.symmetry_x or tool_attributes.symmetry_z:
@@ -196,7 +199,7 @@ func add_setting(p_params: Dictionary) -> void:
 			var checkbox := CheckBox.new()
 			checkbox.set_flat(true)
 			checkbox.button_pressed = p_params.get("default", false) # Fallback base value
-			if saved_setting_value is not String and str(saved_setting_value) != "ERROR":
+			if saved_setting_value != null and saved_setting_value is not String and str(saved_setting_value) != "ERROR":
 				checkbox.button_pressed = saved_setting_value
 			checkbox.toggled.connect(func(pressed): _on_setting_changed(setting_name, pressed))
 			checkbox.set_custom_minimum_size(Vector2(25, 25))
@@ -220,7 +223,7 @@ func add_setting(p_params: Dictionary) -> void:
 				checkbox.set_flat(true)
 				
 				var s_val = _get_setting_value(flag_name)
-				if s_val is not String and str(s_val) != "ERROR":
+				if s_val != null and s_val is not String and str(s_val) != "ERROR":
 					checkbox.button_pressed = s_val
 				else:
 					checkbox.button_pressed = flag_default
@@ -275,12 +278,12 @@ func add_setting(p_params: Dictionary) -> void:
 			var range_max = range_data.y
 			var range_step = range_data.z
 			var default_value = p_params.get("default", 10.0) # Fallback base value
-			if saved_setting_value is not String and str(saved_setting_value) != "ERROR":
+			if saved_setting_value != null and saved_setting_value is not String and str(saved_setting_value) != "ERROR":
 				default_value = saved_setting_value
 			
 			cont = MarginContainer.new()
 			cont.set_custom_minimum_size(Vector2(80, 35))
-			if setting_name == "height" or setting_name == "ease_value":
+			if setting_name == "height" or setting_name == "ease_value" or setting_name == "falloff_steps":
 				var spin_slider := EditorSpinSlider.new()
 				spin_slider.set_flat(true)
 				spin_slider.allow_greater = true
@@ -313,7 +316,7 @@ func add_setting(p_params: Dictionary) -> void:
 			for option in options:
 				option_button.add_item(option)
 			var default_value = p_params.get("default", 0) # Fallback base value
-			if saved_setting_value is not String and str(saved_setting_value) != "ERROR":
+			if saved_setting_value != null and saved_setting_value is not String and str(saved_setting_value) != "ERROR":
 				default_value = saved_setting_value
 			option_button.selected = default_value
 
@@ -544,7 +547,9 @@ func _get_setting_value(p_setting_name: String) -> Variant:
 		"flatten":
 			return plugin.flatten
 		"falloff":
-			return plugin.falloff
+			return plugin.falloff_mode
+		"falloff_steps":
+			return plugin.falloff_steps
 		"mask_mode":
 			return plugin.should_mask_grass
 		"symmetry_x":

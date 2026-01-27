@@ -58,7 +58,10 @@ var ease_value : float = -1.0 # No ease
 var strength : float = 1.0
 var height : float = 0.0
 var flatten : bool = true
-var falloff : bool = true
+# Falloff settings
+enum FalloffMode { NONE = 0, LINEAR = 1, SMOOTH = 2, SHARP = 3, PLATEAU = 4, TERRACED = 5 }
+var falloff_mode : int = FalloffMode.SMOOTH
+var falloff_steps : int = 5
 
 var should_mask_grass : bool = false
 var symmetry_x : bool = false:
@@ -210,7 +213,7 @@ func _exit_tree():
 
 
 func _ready():
-	BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_visible", falloff)
+	BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_mode", falloff_mode)
 
 
 func _edit(object: Object) -> void:
@@ -328,10 +331,10 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 					flatten = false
 					is_making_bridge = true
 					bridge_start_pos = brush_position
-				if mode == TerrainToolMode.SMOOTH and falloff == false:
-					falloff = true
-				if (mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK or mode == TerrainToolMode.DEBUG_BRUSH) and falloff == true:
-					falloff = false
+				if mode == TerrainToolMode.SMOOTH and falloff_mode == FalloffMode.NONE:
+					falloff_mode = FalloffMode.SMOOTH
+				if (mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK or mode == TerrainToolMode.DEBUG_BRUSH) and falloff_mode != FalloffMode.NONE:
+					falloff_mode = FalloffMode.NONE
 				if (mode == TerrainToolMode.GRASS_MASK or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.DEBUG_BRUSH) and flatten == true:
 					flatten = false
 				if mode == TerrainToolMode.LEVEL and Input.is_key_pressed(KEY_CTRL):

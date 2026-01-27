@@ -51,9 +51,18 @@ var flatten : Dictionary = {
 
 var falloff : Dictionary = {
 	"name": "falloff",
-	"type": "checkbox",
+	"type": "option",
 	"label": "Falloff",
-	"default": true,
+	"options": ["None", "Linear", "Smooth", "Sharp", "Plateau", "Terraced"],
+	"default": 2, # SMOOTH
+}
+
+var falloff_steps : Dictionary = {
+	"name": "falloff_steps",
+	"type": "slider",
+	"label": "Falloff Steps",
+	"range": Vector3(2.0, 20.0, 1.0),
+	"default": 5.0,
 }
 
 var mask_mode : Dictionary = {

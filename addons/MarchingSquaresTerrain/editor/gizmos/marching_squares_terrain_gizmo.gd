@@ -164,7 +164,7 @@ func _redraw():
 								continue
 							
 							var sample
-							if terrain_plugin.falloff:
+							if terrain_plugin.falloff_mode != 0: # Not NONE
 								var t: float
 								match terrain_plugin.current_brush_index:
 									0: # Round brush
@@ -175,7 +175,22 @@ func _redraw():
 										var uv = local / (terrain_plugin.brush_size * 0.5)
 										var d = max(abs(uv.x), abs(uv.y))
 										t = 1.0 - clamp(d, 0.2, 1.0) 
-								sample = terrain_plugin.falloff_curve.sample(clamp(t, 0.001, 0.999))
+								
+								# Apply curve based on mode
+								match terrain_plugin.falloff_mode:
+									1: # LINEAR
+										sample = t
+									2: # SMOOTH
+										sample = terrain_plugin.falloff_curve.sample(clamp(t, 0.001, 0.999))
+									3: # SHARP
+										sample = pow(t, 2.0)
+									4: # PLATEAU
+										sample = smoothstep(0.0, 0.2, t)
+									5: # TERRACED
+										var steps = float(terrain_plugin.falloff_steps)
+										sample = floor(t * steps) / (steps - 1.0)
+									_:
+										sample = t
 							else:
 								sample = 1.0
 							

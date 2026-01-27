@@ -90,8 +90,8 @@ func _on_tool_changed(tool_index: int) -> void:
 	else:
 		texture_settings.hide()
 	if tool_index == 3: # Bridge tool
-		plugin.falloff = false
-		plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_visible", false)
+		plugin.falloff_mode = 0
+		plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_mode", 0)
 
 
 	plugin.active_tool = tool_index
@@ -106,7 +106,7 @@ func _on_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 				plugin.current_brush_index = p_value
 				plugin.BRUSH_RADIUS_VISUAL = plugin.BrushMode.get(str(p_value))
 				plugin.BRUSH_RADIUS_MATERIAL = plugin.BrushMat.get(str(p_value))
-				plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_visible", plugin.falloff)
+				plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_mode", plugin.falloff_mode)
 		"size":
 			if p_value is float or p_value is int:
 				plugin.brush_size = float(p_value)
@@ -117,11 +117,19 @@ func _on_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 			if p_value is bool:
 				plugin.flatten = p_value
 		"falloff":
-			if p_value is bool:
-				plugin.falloff = p_value
+			if p_value is int:
+				plugin.falloff_mode = p_value
 				# Update the brush radius material
 				if plugin.BRUSH_RADIUS_MATERIAL:
-					plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_visible", p_value)
+					plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_mode", p_value)
+				
+				# Refresh tool attributes to show/hide steps slider if switching to/from TERRACED (5)
+				tool_attributes.show_tool_attributes(active_tool)
+		"falloff_steps":
+			if p_value is float or p_value is int:
+				plugin.falloff_steps = int(p_value)
+				if plugin.BRUSH_RADIUS_MATERIAL:
+					plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_steps", int(p_value))
 		"strength":
 			if p_value is float or p_value is int:
 				plugin.strength = float(p_value)

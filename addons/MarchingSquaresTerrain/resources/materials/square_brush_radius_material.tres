@@ -5,4 +5,5 @@
 [resource]
 render_priority = 11
 shader = ExtResource("1_x5cba")
-shader_parameter/falloff_visible = true
+shader_parameter/falloff_mode = 0
+shader_parameter/falloff_steps = 5
