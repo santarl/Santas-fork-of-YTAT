@@ -15,13 +15,19 @@ func setup(chunk: MarchingSquaresTerrainChunk, redo: bool = true):
 		printerr("ERROR: SETUP FAILED - no chunk or terrain system found for GrassPlanter")
 		return
 	
-	if (redo and multimesh) or !multimesh:
-		multimesh = MultiMesh.new()
-	multimesh.instance_count = 0
+	var required_count = (_chunk.dimensions.x-1) * (_chunk.dimensions.z-1) * terrain_system.grass_subdivisions * terrain_system.grass_subdivisions
 	
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.use_custom_data = true
-	multimesh.instance_count = (_chunk.dimensions.x-1) * (_chunk.dimensions.z-1) * terrain_system.grass_subdivisions * terrain_system.grass_subdivisions
+	if (redo and multimesh) or !multimesh or multimesh.instance_count != required_count:
+		multimesh = MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.use_custom_data = true
+		multimesh.instance_count = required_count
+		
+		# Initialize all instances to hidden to prevent voxel artifacts at 0,0,0
+		var hidden_transform = Transform3D(Basis.from_scale(Vector3.ZERO), Vector3(9999, 9999, 9999))
+		for i in range(multimesh.instance_count):
+			multimesh.set_instance_transform(i, hidden_transform)
+	
 	if terrain_system.grass_mesh:
 		multimesh.mesh = terrain_system.grass_mesh
 	else:

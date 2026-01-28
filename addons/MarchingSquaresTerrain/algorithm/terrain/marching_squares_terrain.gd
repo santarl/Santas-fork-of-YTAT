@@ -489,7 +489,7 @@ func force_regenerate_all() -> void:
 	print("Regenerating all chunks...")
 	for chunk: MarchingSquaresTerrainChunk in chunks.values():
 		if chunk:
-			chunk.regenerate_mesh()
+			chunk.regenerate_all_cells()
 	print("All chunks regenerated.")
 
 

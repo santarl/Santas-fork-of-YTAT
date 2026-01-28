@@ -106,6 +106,7 @@ var draw_height : float
 
 # Is set to true when player clicks on a tile that is part of the current draw pattern, will enter heightdrag setting mode
 var is_setting : bool
+var last_brush_position : Vector3 = Vector3.ZERO # For interpolation
 
 # Track the action (create/delete) during a drag operation in chunk management mode
 var chunk_drag_action : int = -1  # -1 = no action, 0 = delete, 1 = create
@@ -327,6 +328,8 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 		if event is InputEventMouseButton and event.button_index == MouseButton.MOUSE_BUTTON_LEFT:
 			if event.is_pressed() and draw_area_hovered:
 				draw_height_set = false
+				last_brush_position = draw_position # Start anchor for interpolation
+				
 				if mode == TerrainToolMode.BRIDGE and not is_making_bridge:
 					flatten = false
 					is_making_bridge = true
@@ -337,28 +340,43 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 					falloff_mode = FalloffMode.NONE
 				if (mode == TerrainToolMode.GRASS_MASK or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.DEBUG_BRUSH) and flatten == true:
 					flatten = false
+				
 				if mode == TerrainToolMode.LEVEL and Input.is_key_pressed(KEY_CTRL):
 					height = brush_position.y
-				elif Input.is_key_pressed(KEY_SHIFT):
+				elif Input.is_key_pressed(KEY_SHIFT) or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK or mode == TerrainToolMode.SMOOTH:
+					# Force drawing mode immediately for painting tools or shift-painting
 					is_drawing = true
+					is_setting = false
 					brush_position = draw_position
+					# Initial draw
+					update_draw_pattern(brush_position)
 				else:
+					# Sculpting default: start in setting mode, promoted to drawing if mouse moves to new cell
 					is_setting = true
+					is_drawing = false
 					if not flatten:
 						draw_height = draw_position.y
 			elif event.is_released():
+				# ... release logic ...
 				if is_making_bridge:
 					is_making_bridge = false
 				if is_drawing:
 					is_drawing = false
+					var affected_chunks = current_draw_pattern.keys().duplicate()
+					
 					if mode == TerrainToolMode.GRASS_MASK or mode == TerrainToolMode.LEVEL or mode == TerrainToolMode.BRIDGE or mode == TerrainToolMode.DEBUG_BRUSH:
-						draw_pattern(terrain)
+						draw_pattern(terrain, true) # Final apply with grass
 						current_draw_pattern.clear()
-					if mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING:
+					elif mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING:
+						# For continuous tools, do a final rescatter on all touched chunks
+						for chunk_coords in affected_chunks:
+							if terrain.chunks.has(chunk_coords):
+								terrain.chunks[chunk_coords].regenerate_mesh(true)
 						current_draw_pattern.clear()
+						
 				if is_setting:
 					is_setting = false
-					draw_pattern(terrain)
+					draw_pattern(terrain, true) # Final apply with grass
 					if Input.is_key_pressed(KEY_SHIFT):
 						draw_height = brush_position.y
 					else:
@@ -384,9 +402,33 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 				
 		if draw_area_hovered and event is InputEventMouseMotion:
 			brush_position = draw_position
-			if is_drawing and (mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK):
-				draw_pattern(terrain)
-				current_draw_pattern.clear()
+			if is_drawing:
+				# Decide if we interpolate (only for sculpting/bridge/smooth)
+				var should_interpolate = (mode == TerrainToolMode.BRUSH or mode == TerrainToolMode.LEVEL or mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.BRIDGE)
+				
+				if should_interpolate:
+					# Line Interpolation for smoother strokes
+					var dist = last_brush_position.distance_to(brush_position)
+					var step_size = max(0.5, brush_size * 0.25)
+					
+					if dist > step_size:
+						var steps = floor(dist / step_size)
+						for i in range(1, int(steps) + 1):
+							var t = float(i) / float(steps)
+							var interp_pos = last_brush_position.lerp(brush_position, t)
+							update_draw_pattern(interp_pos)
+					else:
+						update_draw_pattern(brush_position)
+				else:
+					# No interpolation for Vertex Painting, Grass Mask, etc. (High precision)
+					update_draw_pattern(brush_position)
+				
+				last_brush_position = brush_position
+				
+				if (mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK):
+					# Optimization: Skip grass rescatter while dragging
+					draw_pattern(terrain, false)
+					current_draw_pattern.clear()
 		
 		gizmo_plugin.terrain_gizmo._redraw()
 		return EditorPlugin.AFTER_GUI_INPUT_PASS
@@ -473,7 +515,99 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 	return EditorPlugin.AFTER_GUI_INPUT_PASS
 
 
-func draw_pattern(terrain: MarchingSquaresTerrain):
+# Calculates brush pattern and updates current_draw_pattern
+func update_draw_pattern(b_pos: Vector3):
+	var terrain_system : MarchingSquaresTerrain = current_terrain_node
+	
+	# Calculate bounds
+	var pos_tl := Vector2(b_pos.x - brush_size/2, b_pos.z - brush_size/2)
+	var pos_br := Vector2(b_pos.x + brush_size/2, b_pos.z + brush_size/2)
+	
+	var chunk_tl_x := floori(pos_tl.x / ((terrain_system.dimensions.x - 1) * terrain_system.cell_size.x))
+	var chunk_tl_z := floori(pos_tl.y / ((terrain_system.dimensions.z - 1) * terrain_system.cell_size.y))
+	
+	var chunk_br_x := floori(pos_br.x / ((terrain_system.dimensions.x - 1) * terrain_system.cell_size.x))
+	var chunk_br_z := floori(pos_br.y / ((terrain_system.dimensions.z - 1) * terrain_system.cell_size.y))
+	
+	var x_tl := floori(pos_tl.x / terrain_system.cell_size.x - chunk_tl_x * (terrain_system.dimensions.x - 1))
+	var z_tl := floori(pos_tl.y / terrain_system.cell_size.y - chunk_tl_z * (terrain_system.dimensions.z - 1))
+	
+	var x_br := floori(pos_br.x / terrain_system.cell_size.x - chunk_br_x * (terrain_system.dimensions.x - 1))
+	var z_br := floori(pos_br.y / terrain_system.cell_size.y - chunk_br_z * (terrain_system.dimensions.z - 1))
+	
+	var max_distance = brush_size / 2
+	match current_brush_index:
+		0: # Round brush
+			max_distance *= max_distance
+		1: # Square brush
+			max_distance *= max_distance * 2
+	
+	for chunk_z in range(chunk_tl_z, chunk_br_z+1):
+		for chunk_x in range(chunk_tl_x, chunk_br_x+1):
+			var cursor_chunk_coords = Vector2i(chunk_x, chunk_z)
+			if not terrain_system.chunks.has(cursor_chunk_coords):
+				continue
+			var chunk: MarchingSquaresTerrainChunk = terrain_system.chunks[cursor_chunk_coords]
+			
+			var x_min : int = x_tl if chunk_x == chunk_tl_x else 0
+			var x_max : int = x_br if chunk_x == chunk_br_x else int(terrain_system.dimensions.x)
+			
+			var z_min : int = z_tl if chunk_z == chunk_tl_z else 0
+			var z_max : int = z_br if chunk_z == chunk_br_z else int(terrain_system.dimensions.z)
+			
+			for z in range(z_min, z_max):
+				for x in range(x_min, x_max):
+					var cursor_cell_coords = Vector2i(x, z)
+					var world_x: float = (chunk_x * (terrain_system.dimensions.x-1) + x) * terrain_system.cell_size.x
+					var world_z: float = (chunk_z * (terrain_system.dimensions.z-1) + z) * terrain_system.cell_size.y
+					
+					var distance_squared: float = Vector2(b_pos.x, b_pos.z).distance_squared_to(Vector2(world_x, world_z))
+					if distance_squared > max_distance:
+						continue
+					
+					var sample
+					if falloff_mode != 0: # Not NONE
+						var t: float
+						match current_brush_index:
+							0: # Round brush
+								var d = (max_distance - distance_squared)/max_distance
+								t = clamp(d, 0.0, 1.0)
+							1: # Square brush
+								var local = Vector2(world_x - b_pos.x, world_z - b_pos.z)
+								var uv = local / (brush_size * 0.5)
+								var d = max(abs(uv.x), abs(uv.y))
+								t = 1.0 - clamp(d, 0.2, 1.0) 
+						
+						# Apply curve based on mode
+						match falloff_mode:
+							1: # LINEAR
+								sample = t
+							2: # SMOOTH
+								sample = falloff_curve.sample(clamp(t, 0.001, 0.999))
+							3: # SHARP
+								sample = pow(t, 2.0)
+							4: # PLATEAU
+								sample = smoothstep(0.0, 0.2, t)
+							5: # TERRACED
+								var steps = float(falloff_steps) + 1.0
+								sample = floor(t * steps) / (steps - 1.0)
+							_:
+								sample = t
+					else:
+						sample = 1.0
+					
+					# Store largest sample
+					if not current_draw_pattern.has(cursor_chunk_coords):
+						current_draw_pattern[cursor_chunk_coords] = {}
+					if current_draw_pattern[cursor_chunk_coords].has(cursor_cell_coords):
+						var prev_sample = current_draw_pattern[cursor_chunk_coords][cursor_cell_coords]
+						if sample > prev_sample:
+							current_draw_pattern[cursor_chunk_coords][cursor_cell_coords] = sample
+					else:
+						current_draw_pattern[cursor_chunk_coords][cursor_cell_coords] = sample
+
+
+func draw_pattern(terrain: MarchingSquaresTerrain, update_grass: bool = true):
 	var undo_redo := MarchingSquaresTerrainPlugin.instance.get_undo_redo()
 	
 	var pattern = {}
@@ -651,64 +785,64 @@ func draw_pattern(terrain: MarchingSquaresTerrain):
 	
 	if mode == TerrainToolMode.VERTEX_PAINTING:
 		undo_redo.create_action("terrain color_0 draw")
-		undo_redo.add_do_method(self, "draw_color_0_pattern_action", terrain, pattern)
-		undo_redo.add_undo_method(self, "draw_color_0_pattern_action", terrain, restore_pattern)
+		undo_redo.add_do_method(self, "draw_color_0_pattern_action", terrain, pattern, update_grass)
+		undo_redo.add_undo_method(self, "draw_color_0_pattern_action", terrain, restore_pattern, update_grass)
 		undo_redo.commit_action()
 		
 		undo_redo.create_action("terrain color_1 draw")
-		undo_redo.add_do_method(self, "draw_color_1_pattern_action", terrain, pattern_cc)
-		undo_redo.add_undo_method(self, "draw_color_1_pattern_action", terrain, restore_pattern_cc)
+		undo_redo.add_do_method(self, "draw_color_1_pattern_action", terrain, pattern_cc, update_grass)
+		undo_redo.add_undo_method(self, "draw_color_1_pattern_action", terrain, restore_pattern_cc, update_grass)
 		undo_redo.commit_action()
 	elif mode == TerrainToolMode.GRASS_MASK:
 		undo_redo.create_action("terrain grass mask draw")
-		undo_redo.add_do_method(self, "draw_grass_mask_pattern_action", terrain, pattern)
-		undo_redo.add_undo_method(self, "draw_grass_mask_pattern_action", terrain, restore_pattern)
+		undo_redo.add_do_method(self, "draw_grass_mask_pattern_action", terrain, pattern, update_grass)
+		undo_redo.add_undo_method(self, "draw_grass_mask_pattern_action", terrain, restore_pattern, update_grass)
 		undo_redo.commit_action()
 	else:
 		undo_redo.create_action("terrain height draw")
-		undo_redo.add_do_method(self, "draw_height_pattern_action", terrain, pattern)
-		undo_redo.add_undo_method(self, "draw_height_pattern_action", terrain, restore_pattern)
+		undo_redo.add_do_method(self, "draw_height_pattern_action", terrain, pattern, update_grass)
+		undo_redo.add_undo_method(self, "draw_height_pattern_action", terrain, restore_pattern, update_grass)
 		undo_redo.commit_action()
 
 
 # For each cell in pattern, raise/lower by y delta.
-func draw_height_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary):
+func draw_height_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary, update_grass: bool = true):
 	for draw_chunk_coords: Vector2i in pattern:
 		var draw_chunk_dict = pattern[draw_chunk_coords]
 		var chunk: MarchingSquaresTerrainChunk = terrain.chunks[draw_chunk_coords]
 		for draw_cell_coords: Vector2i in draw_chunk_dict:
 			var height: float = draw_chunk_dict[draw_cell_coords]
 			chunk.draw_height(draw_cell_coords.x, draw_cell_coords.y, height)
-		chunk.regenerate_mesh()
+		chunk.regenerate_mesh(update_grass)
 
 
-func draw_color_0_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary):
+func draw_color_0_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary, update_grass: bool = true):
 	for draw_chunk_coords: Vector2i in pattern:
 		var draw_chunk_dict = pattern[draw_chunk_coords]
 		var chunk: MarchingSquaresTerrainChunk = terrain.chunks[draw_chunk_coords]
 		for draw_cell_coords: Vector2i in draw_chunk_dict:
 			var color: Color = draw_chunk_dict[draw_cell_coords]
 			chunk.draw_color_0(draw_cell_coords.x, draw_cell_coords.y, color)
-		chunk.regenerate_mesh()
+		chunk.regenerate_mesh(update_grass)
 
-func draw_color_1_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary):
+func draw_color_1_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary, update_grass: bool = true):
 	for draw_chunk_coords: Vector2i in pattern:
 		var draw_chunk_dict = pattern[draw_chunk_coords]
 		var chunk: MarchingSquaresTerrainChunk = terrain.chunks[draw_chunk_coords]
 		for draw_cell_coords: Vector2i in draw_chunk_dict:
 			var color: Color = draw_chunk_dict[draw_cell_coords]
 			chunk.draw_color_1(draw_cell_coords.x, draw_cell_coords.y, color)
-		chunk.regenerate_mesh()
+		chunk.regenerate_mesh(update_grass)
 
 
-func draw_grass_mask_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary):
+func draw_grass_mask_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary, update_grass: bool = true):
 	for draw_chunk_coords: Vector2i in pattern:
 		var draw_chunk_dict = pattern[draw_chunk_coords]
 		var chunk: MarchingSquaresTerrainChunk = terrain.chunks[draw_chunk_coords]
 		for draw_cell_coords: Vector2i in draw_chunk_dict:
 			var mask: Color = draw_chunk_dict[draw_cell_coords]
 			chunk.draw_grass_mask(draw_cell_coords.x, draw_cell_coords.y, mask)
-		chunk.regenerate_mesh()
+		chunk.regenerate_mesh(update_grass)
 
 
 func _set_vertex_colors(vc_idx: int) -> void:

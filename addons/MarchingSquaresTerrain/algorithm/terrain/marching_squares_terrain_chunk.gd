@@ -117,7 +117,7 @@ func _exit_tree() -> void:
 			ResourceSaver.save(mesh, "res://"+scene.name+"/"+name+".tres", ResourceSaver.FLAG_COMPRESS)
 
 
-func regenerate_mesh():
+func regenerate_mesh(update_grass: bool = true):
 	st = SurfaceTool.new()
 	if mesh:
 		st.create_from(mesh, 0)
@@ -132,10 +132,9 @@ func regenerate_mesh():
 		generate_color_maps()
 	if not grass_mask_map:
 		generate_grass_mask_map()
-	if not new_chunk:
-		new_chunk = true # Force update if we are regenerating
 	
-	generate_terrain_cells()
+	# Generate geometry without incremental grass updates
+	generate_terrain_cells(false)
 	
 	if new_chunk:
 		new_chunk = false
@@ -158,6 +157,10 @@ func regenerate_mesh():
 			child.collision_layer = 17 # ground (1) + terrain (16)
 			if Engine.is_editor_hint() and terrain_system and terrain_system.enable_runtime_generation:
 				child.owner = null # Ensure collision is not saved
+	
+	# Only rescatter grass if requested (e.g. on mouse release)
+	if update_grass and grass_planter:
+		grass_planter.regenerate_all_cells()
 	
 	var elapsed_time: int = Time.get_ticks_msec() - start_time
 	print_verbose("Generated terrain in "+str(elapsed_time)+"ms")
@@ -1055,7 +1058,7 @@ func _ensure_grass_planter() -> void:
 			if get_tree() and get_tree().current_scene:
 				grass_planter.owner = get_tree().current_scene
 		
-		grass_planter.setup(self)
+		grass_planter.setup(self, false)
 
 
 func regenerate_all_cells():
