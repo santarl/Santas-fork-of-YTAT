@@ -26,14 +26,22 @@ Watch the [YouTube](https://www.youtube.com/watch?v=TV3QyGNMAwo) video to get st
 
 ## Known Issues
 
-1. Icons appear smaller with the new 4.6 godot standard theme (will be fixed when 4.6 officially launches)
+1. Icons appear smaller with the new 4.6 godot standard theme (will be fixed in 1.1)
 2. Wall textures don't disappear properly when the "void" texture is selected
 3. Collision shapes dissapear when in front of a MarchingSquaresTerrain node
-4. Terrain that is copied into a new open scene fails to load on startup
+4. Terrain that is copied into a new open scene fails to load on startup (will be fixed in 1.1)
+5. Brush visuals and cell data doesn't scale with cell_size so very small and very big cell sizes don't work properly
+6. Running physics on a separate thread crashes the plugin
+7. Terrain sizes are very big causing warning messages (will be fixed in 1.1)
 
 ## Credits
 
 Developed by [Yūgen](https://www.youtube.com/@yugen_seishin) and originally forked from [Jackachulian](https://github.com/jackachulian/jackachulian) on github.
+
+Special Contributors:
+* [DanTrz](https://github.com/DanTrz)
+
+A special thanks to DanTrz (creator of the TileMapLayer3D plugin) for co-authoring big parts of the plugin since the 1.0 release. He has been an amazing contributor to the project and an awesome guy to work with!
 
 Contributors:
 * [Dylearn](https://www.youtube.com/@Dylearn)
