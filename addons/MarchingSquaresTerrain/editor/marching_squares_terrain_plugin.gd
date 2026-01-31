@@ -358,6 +358,8 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 				elif Input.is_key_pressed(KEY_SHIFT):
 					is_drawing = true
 					brush_position = draw_position
+					# Initial draw
+					update_draw_pattern(brush_position)
 				else:
 					is_setting = true
 					if not flatten:
@@ -400,9 +402,12 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 		
 		if draw_area_hovered and event is InputEventMouseMotion:
 			brush_position = draw_position
-			if is_drawing and (mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK):
-				draw_pattern(terrain)
-				current_draw_pattern.clear()
+			if is_drawing:
+				update_draw_pattern(brush_position)
+				
+				if (mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK):
+					draw_pattern(terrain)
+					current_draw_pattern.clear()
 		
 		gizmo_plugin.terrain_gizmo._redraw()
 		return EditorPlugin.AFTER_GUI_INPUT_PASS
