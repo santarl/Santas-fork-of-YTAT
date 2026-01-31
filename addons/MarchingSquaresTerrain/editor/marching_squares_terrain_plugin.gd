@@ -65,7 +65,10 @@ var ease_value : float = -1.0 # No ease
 var strength : float = 1.0
 var height : float = 0.0
 var flatten : bool = true
-var falloff : bool = true
+# Falloff settings
+enum FalloffMode { NONE = 0, LINEAR = 1, SMOOTH = 2, SHARP = 3, PLATEAU = 4, TERRACED = 5 }
+var falloff_mode : int = FalloffMode.SMOOTH
+var falloff_steps : int = 5
 
 var should_mask_grass : bool = false
 
@@ -208,7 +211,7 @@ func _exit_tree():
 
 
 func _ready():
-	BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_visible", falloff)
+	BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_mode", falloff_mode)
 
 
 func _edit(object: Object) -> void:
