@@ -136,101 +136,95 @@ func _redraw():
 		var x_br := floori(pos_br.x / terrain_system.cell_size.x - chunk_br_x * (terrain_system.dimensions.x - 1))
 		var z_br := floori(pos_br.y / terrain_system.cell_size.y - chunk_br_z * (terrain_system.dimensions.z - 1))
 		
-		var max_distance = terrain_plugin.brush_size / 2
-		match terrain_plugin.current_brush_index:
-			0: # Round brush
-				max_distance *= max_distance
-			1: # Square brush
-				max_distance *= max_distance * 2
+				var max_distance = terrain_plugin.brush_size / 2
 		
-		for chunk_z in range(chunk_tl_z, chunk_br_z+1):
-			for chunk_x in range(chunk_tl_x, chunk_br_x+1):
-				cursor_chunk_coords = Vector2i(chunk_x, chunk_z)
-				if not terrain_system.chunks.has(cursor_chunk_coords):
-					continue
-				var chunk: MarchingSquaresTerrainChunk = terrain_system.chunks[cursor_chunk_coords]
+				match terrain_plugin.current_brush_index:
+		
+					0: # Round brush
+		
+						max_distance *= max_distance
+		
+					1: # Square brush
+		
+						max_distance *= max_distance * 2
+		
 				
-				var x_min := x_tl if chunk_x == chunk_tl_x else 0
-				var x_max := x_br if chunk_x == chunk_br_x else terrain_system.dimensions.x
+		
+				# Draw the cursor brush at the current position (visual only)
+		
+				# NOTE: Actual calculation is now done in plugin.update_draw_pattern()
+		
+				# We iterate over the ALREADY CALCULATED pattern to draw the visual indicators
+		
 				
-				var z_min := z_tl if chunk_z == chunk_tl_z else 0
-				var z_max := z_br if chunk_z == chunk_br_z else terrain_system.dimensions.z
-				
-				for z in range(z_min, z_max):
-					for x in range(x_min, x_max):
-						cursor_cell_coords = Vector2i(x, z)
-						var world_x: float = (chunk_x * (terrain_system.dimensions.x-1) + x) * terrain_system.cell_size.x
-						var world_z: float = (chunk_z * (terrain_system.dimensions.z-1) + z) * terrain_system.cell_size.y
-						
-						var distance_squared: float = Vector2(pos.x, pos.z).distance_squared_to(Vector2(world_x, world_z))
-						if distance_squared > max_distance:
+		
+				if not terrain_plugin.current_draw_pattern.is_empty():
+		
+					for draw_chunk_coords: Vector2i in terrain_plugin.current_draw_pattern:
+		
+						if not terrain_system.chunks.has(draw_chunk_coords):
+		
 							continue
+		
+							
+		
+						var chunk = terrain_system.chunks[draw_chunk_coords]
+		
+						var draw_chunk_dict: Dictionary = terrain_plugin.current_draw_pattern[draw_chunk_coords]
+		
 						
-						var sample
-						if terrain_plugin.falloff:
-							var t: float
-							match terrain_plugin.current_brush_index:
-								0: # Round brush
-									var d = (max_distance - distance_squared)/max_distance
-									t = clamp(d, 0.0, 1.0)
-								1: # Square brush
-									var local = Vector2(world_x - pos.x, world_z - pos.z)
-									var uv = local / (terrain_plugin.brush_size * 0.5)
-									var d = max(abs(uv.x), abs(uv.y))
-									t = 1.0 - clamp(d, 0.2, 1.0) 
-							sample = terrain_plugin.falloff_curve.sample(clamp(t, 0.001, 0.999))
-						else:
-							sample = 1.0
-						
-						var y: float
-						if not terrain_plugin.current_draw_pattern.is_empty() and terrain_plugin.flatten:
-							y = terrain_plugin.draw_height
-						else:
-							y = chunk.height_map[z][x]
-						
-						var draw_position = Vector3(world_x, y, world_z)
-						var draw_transform = Transform3D(Vector3.RIGHT*sample, Vector3.UP*sample, Vector3.BACK*sample, draw_position)
-						# Only draw ground brush squares if NOT in wall paint mode
-						if not is_wall_painting:
-							add_mesh(terrain_plugin.BRUSH_VISUAL, brush_material, draw_transform)
-						
-						# Draw to current pattern
-						if terrain_plugin.is_drawing:
-							if not terrain_plugin.current_draw_pattern.has(cursor_chunk_coords):
-								terrain_plugin.current_draw_pattern[cursor_chunk_coords] = {}
-							if terrain_plugin.current_draw_pattern[cursor_chunk_coords].has(cursor_cell_coords):
-								var prev_sample = terrain_plugin.current_draw_pattern[cursor_chunk_coords][cursor_cell_coords]
-								if sample > prev_sample:
-									terrain_plugin.current_draw_pattern[cursor_chunk_coords][cursor_cell_coords] = sample
+		
+						for draw_coords: Vector2i in draw_chunk_dict:
+		
+							var sample: float = draw_chunk_dict[draw_coords]
+		
+							if sample <= 0.001: 
+		
+								continue
+		
+		
+		
+							var draw_x = (draw_chunk_coords.x * (terrain_system.dimensions.x - 1) + draw_coords.x) * terrain_system.cell_size.x
+		
+							var draw_z = (draw_chunk_coords.y * (terrain_system.dimensions.z - 1) + draw_coords.y) * terrain_system.cell_size.y
+		
+							
+		
+							# Determine height for visual
+		
+							var draw_y : float
+		
+							if terrain_plugin.flatten:
+		
+								draw_y = terrain_plugin.draw_height
+		
 							else:
-								terrain_plugin.current_draw_pattern[cursor_chunk_coords][cursor_cell_coords] = sample
-	
-	var height_diff: float
-	if terrain_plugin.is_setting and terrain_plugin.draw_height_set:
-		height_diff = terrain_plugin.brush_position.y - terrain_plugin.draw_height
-	
-	if not terrain_plugin.current_draw_pattern.is_empty():
-		for draw_chunk_coords: Vector2i in terrain_plugin.current_draw_pattern:
-			var chunk = terrain_system.chunks[draw_chunk_coords]
-			var draw_chunk_dict: Dictionary = terrain_plugin.current_draw_pattern[draw_chunk_coords]
-			for draw_coords: Vector2i in draw_chunk_dict:
-				var draw_x = (draw_chunk_coords.x * (terrain_system.dimensions.x - 1) + draw_coords.x) * terrain_system.cell_size.x
-				var draw_z = (draw_chunk_coords.y * (terrain_system.dimensions.z - 1) + draw_coords.y) * terrain_system.cell_size.y
-				var draw_y = terrain_plugin.draw_height if terrain_plugin.flatten else chunk.height_map[draw_coords.y][draw_coords.x]
-				
-				var sample: float = draw_chunk_dict[draw_coords]
-				
-				# If setting, also show a square at the height to set to
-				if terrain_plugin.is_setting and terrain_plugin.draw_height_set:
-					var draw_position = Vector3(draw_x, draw_y + height_diff * sample, draw_z)
-					var draw_transform = Transform3D(Vector3.RIGHT*sample, Vector3.UP*sample, Vector3.BACK*sample, draw_position)
-					if not is_wall_painting:
-						add_mesh(terrain_plugin.BRUSH_VISUAL, null, draw_transform)
-				else:
-					var draw_position = Vector3(draw_x, draw_y, draw_z)
-					var draw_transform = Transform3D(Vector3.RIGHT*sample, Vector3.UP*sample, Vector3.BACK*sample, draw_position)
-					if not is_wall_painting:
-						add_mesh(terrain_plugin.BRUSH_VISUAL, null, draw_transform)
+		
+								# If we are setting height, we preview the target height
+		
+								if terrain_plugin.is_setting and terrain_plugin.draw_height_set:
+		
+									var height_diff = terrain_plugin.brush_position.y - terrain_plugin.draw_height
+		
+									draw_y = chunk.height_map[draw_coords.y][draw_coords.x] + height_diff * sample
+		
+								else:
+		
+									# Otherwise show current terrain height
+		
+									draw_y = chunk.height_map[draw_coords.y][draw_coords.x]
+		
+		
+		
+							var draw_position = Vector3(draw_x, draw_y, draw_z)
+		
+							var draw_transform = Transform3D(Vector3.RIGHT*sample, Vector3.UP*sample, Vector3.BACK*sample, draw_position)
+		
+							
+		
+							if not is_wall_painting:
+		
+								add_mesh(terrain_plugin.BRUSH_VISUAL, null, draw_transform)
 
 
 func _create_brush_basis(normal: Vector3, brush_size: float) -> Basis:
