@@ -112,8 +112,11 @@ var draw_height_set : bool
 # Height of the current pattern that is being drawn at for the brush tool
 var draw_height : float
 
-# Is set to true when the user clicks on a tile that is part of the current draw pattern, will enter heightdrag setting mode
+# Is set to true when player clicks on a tile that is part of the current draw pattern, will enter heightdrag setting mode
 var is_setting : bool
+var last_brush_position : Vector3 = Vector3.ZERO # For interpolation
+
+# Track the action (create/delete) during a drag operation in chunk management mode
 
 var is_making_bridge : bool
 var bridge_start_pos : Vector3
@@ -343,6 +346,8 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 		if event is InputEventMouseButton and event.button_index == MouseButton.MOUSE_BUTTON_LEFT:
 			if event.is_pressed() and draw_area_hovered:
 				draw_height_set = false
+				last_brush_position = draw_position # Start anchor for interpolation
+				
 				if mode == TerrainToolMode.BRIDGE and not is_making_bridge:
 					flatten = false
 					is_making_bridge = true
@@ -403,7 +408,27 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 		if draw_area_hovered and event is InputEventMouseMotion:
 			brush_position = draw_position
 			if is_drawing:
-				update_draw_pattern(brush_position)
+				# Decide if we interpolate (only for sculpting/bridge/smooth)
+				var should_interpolate = (mode == TerrainToolMode.BRUSH or mode == TerrainToolMode.LEVEL or mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.BRIDGE)
+				
+				if should_interpolate:
+					# Line Interpolation for smoother strokes
+					var dist = last_brush_position.distance_to(brush_position)
+					var step_size = max(0.5, brush_size * 0.25)
+					
+					if dist > step_size:
+						var steps = floor(dist / step_size)
+						for i in range(1, int(steps) + 1):
+							var t = float(i) / float(steps)
+							var interp_pos = last_brush_position.lerp(brush_position, t)
+							update_draw_pattern(interp_pos)
+					else:
+						update_draw_pattern(brush_position)
+				else:
+					# No interpolation for Vertex Painting, Grass Mask, etc. (High precision)
+					update_draw_pattern(brush_position)
+				
+				last_brush_position = brush_position
 				
 				if (mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK):
 					draw_pattern(terrain)
