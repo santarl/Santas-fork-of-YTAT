@@ -306,126 +306,125 @@ func generate_terrain_cells():
 			cell.generate_geometry()
 			if grass_planter and grass_planter.terrain_system:
 				grass_planter.generate_grass_on_cell(cell_coords)
-				
+
+
+#region Color Interpolation Helpers
+
+## Returns [source_map_0, source_map_1] based on floor/wall/ridge state
+func _get_color_sources(is_floor: bool, is_ridge: bool) -> Array[PackedColorArray]:
+	var use_wall_colors := (not is_floor) or is_ridge
+	if terrain_system.blend_mode == 1 and is_floor and not is_ridge:
+		use_wall_colors = false  # Only force floor colors for non-ridge floor vertices
+
+	var src_0 : PackedColorArray = wall_color_map_0 if use_wall_colors else color_map_0
+	var src_1 : PackedColorArray = wall_color_map_1 if use_wall_colors else color_map_1
+	return [src_0, src_1]
+
+
+## Calculates color for diagonal midpoint vertices
+func _calc_diagonal_color(source_map: PackedColorArray) -> Color:
+	if terrain_system.blend_mode == 1:
+		# Hard edge mode uses same color as cell's top-left corner
+		return source_map[cell_coords.y * dimensions.x + cell_coords.x]
+
+	# Smooth blend mode - lerp diagonal corners for smoother effect
+	var idx := cell_coords.y * dimensions.x + cell_coords.x
+	var ad_color := lerp(source_map[idx], source_map[idx + dimensions.x + 1], 0.5)
+	var bc_color := lerp(source_map[idx + 1], source_map[idx + dimensions.x], 0.5)
+	var result := Color(min(ad_color.r, bc_color.r), min(ad_color.g, bc_color.g), min(ad_color.b, bc_color.b), min(ad_color.a, bc_color.a))
+	if ad_color.r > 0.99 or bc_color.r > 0.99: result.r = 1.0
+	if ad_color.g > 0.99 or bc_color.g > 0.99: result.g = 1.0
+	if ad_color.b > 0.99 or bc_color.b > 0.99: result.b = 1.0
+	if ad_color.a > 0.99 or bc_color.a > 0.99: result.a = 1.0
+	return result
+
+
+## Calculates height-based color for boundary cells (prevents color bleeding between heights)
+func _calc_boundary_color(y: float, source_map: PackedColorArray, lower_color: Color, upper_color: Color) -> Color:
+	if terrain_system.blend_mode == 1:
+		# Hard edge mode uses cell's corner color
+		return source_map[cell_coords.y * dimensions.x + cell_coords.x]
+
+	# HEIGHT-BASED SAMPLING for smooth blend mode
+	var height_range := cell_max_height - cell_min_height
+	var height_factor := clamp((y - cell_min_height) / height_range, 0.0, 1.0)
+
+	# Sharp bands: < lower_thresh = lower color, > upper_thresh = upper color, middle = blend
+	var color: Color
+	if height_factor < lower_thresh:
+		color = lower_color
+	elif height_factor > upper_thresh:
+		color = upper_color
+	else:
+		var blend_factor : float = (height_factor - lower_thresh) / blend_zone
+		color = lerp(lower_color, upper_color, blend_factor)
+
+	return get_dominant_color(color)
+
+
+## Calculates bilinearly interpolated color for flat cells
+func _calc_bilinear_color(x: float, z: float, source_map: PackedColorArray) -> Color:
+	var idx := cell_coords.y * dimensions.x + cell_coords.x
+	var ab_color := lerp(source_map[idx], source_map[idx + 1], x)
+	var cd_color := lerp(source_map[idx + dimensions.x], source_map[idx + dimensions.x + 1], x)
+
+	if terrain_system.blend_mode != 1:
+		return get_dominant_color(lerp(ab_color, cd_color, z))  # Mixed triangles
+	return source_map[idx]  # Perfect square tiles
+
+
+## selects the appropriate color interpolation method
+func _interpolate_vertex_color(
+	x: float, y: float, z: float,
+	source_map: PackedColorArray,
+	diag_midpoint: bool,
+	lower_color: Color,
+	upper_color: Color
+) -> Color:
+	if new_chunk:
+		source_map[cell_coords.y * dimensions.x + cell_coords.x] = Color(1.0, 0.0, 0.0, 0.0)
+		return Color(1.0, 0.0, 0.0, 0.0)
+
+	if diag_midpoint:
+		return _calc_diagonal_color(source_map)
+
+	if cell_is_boundary:
+		return _calc_boundary_color(y, source_map, lower_color, upper_color)
+
+	return _calc_bilinear_color(x, z, source_map)
+
+#endregion
+
 
 # Adds a point. Coordinates are relative to the top-left corner (not mesh origin relative)
 # UV.x is closeness to the bottom of an edge. UV.Y is closeness to the edge of a cliff
 func add_point(x: float, y: float, z: float, uv_x: float, uv_y: float, diag_midpoint: bool = false, cell_has_walls_for_blend: bool = false):
-	
-	# uv - used for ledge detection. X = closeness to top terrace, Y = closeness to bottom of terrace
+	# UV - used for ledge detection. X = closeness to top terrace, Y = closeness to bottom of terrace
 	# Walls will always have UV of 1, 1
-	var uv = Vector2(uv_x, uv_y) if floor_mode else Vector2(1, 1)
+	var uv := Vector2(uv_x, uv_y) if floor_mode else Vector2(1, 1)
 	st.set_uv(uv)
-	
+
 	# Detect ridge BEFORE selecting color maps (ridge needs wall colors, not ground colors)
-	var is_ridge := false
-	if floor_mode and terrain_system.use_ridge_texture:
-		is_ridge = (uv.y > 1.0 - terrain_system.ridge_threshold)
-	
-	# Wall vertices AND ridge vertices use wall_color_map_0/1
-	# In hard edge mode, non-ridge floor vertices use floor colors
-	# Ridge vertices MUST keep wall colors for correct wall texture display
-	var use_wall_colors := (not floor_mode) or is_ridge
-	if terrain_system.blend_mode == 1 and floor_mode and not is_ridge:
-		use_wall_colors = false  # Only force floor colors for non-ridge floor vertices
-	var source_map_0 : PackedColorArray = wall_color_map_0 if use_wall_colors else color_map_0
-	var source_map_1 : PackedColorArray = wall_color_map_1 if use_wall_colors else color_map_1
-	
-	# Attempt to have smoother diagonal paths
-	var color_0: Color
-	if new_chunk:
-		color_0 = Color(1.0, 0.0, 0.0, 0.0)
-		source_map_0[cell_coords.y*dimensions.x + cell_coords.x] = Color(1.0, 0.0, 0.0, 0.0)
-	elif diag_midpoint:
-		if terrain_system.blend_mode == 1:
-			# Hard edge mode uses same color as cell's top-left corner
-			color_0 = source_map_0[cell_coords.y * dimensions.x + cell_coords.x]
-		else:
-			# Smooth blend mode welerp diagonal corners for smoother effect
-			var ad_color = lerp(source_map_0[cell_coords.y*dimensions.x + cell_coords.x], source_map_0[(cell_coords.y + 1)*dimensions.x + cell_coords.x + 1], 0.5)
-			var bc_color = lerp(source_map_0[cell_coords.y*dimensions.x + cell_coords.x + 1], source_map_0[(cell_coords.y + 1)*dimensions.x + cell_coords.x], 0.5)
-			color_0 = Color(min(ad_color.r, bc_color.r), min(ad_color.g, bc_color.g), min(ad_color.b, bc_color.b), min(ad_color.a, bc_color.a))
-			if ad_color.r > 0.99 or bc_color.r > 0.99: color_0.r = 1.0;
-			if ad_color.g > 0.99 or bc_color.g > 0.99: color_0.g = 1.0;
-			if ad_color.b > 0.99 or bc_color.b > 0.99: color_0.b = 1.0;
-			if ad_color.a > 0.99 or bc_color.a > 0.99: color_0.a = 1.0;
-	elif cell_is_boundary:
-		if terrain_system.blend_mode == 1:
-			# Use cell's corner color
-			color_0 = source_map_0[cell_coords.y * dimensions.x + cell_coords.x]
-		else:
-			# HEIGHT-BASED SAMPLING for smooth blend mode
-			# This prevents color bleeding between different height levels
-			var height_range = cell_max_height - cell_min_height
-			var height_factor = clamp((y - cell_min_height) / height_range, 0.0, 1.0)
-			
-			# Select appropriate color set based on vertex type (floor vs wall/ridge)
-			var lower_0: Color = cell_wall_lower_color_0 if use_wall_colors else cell_floor_lower_color_0
-			var upper_0: Color = cell_wall_upper_color_0 if use_wall_colors else cell_floor_upper_color_0
-			
-			# Sharp bands: < 0.3 = lower color, > 0.7 = upper color, middle = blend
-			if height_factor < lower_thresh:
-				color_0 = lower_0
-			elif height_factor > upper_thresh:
-				color_0 = upper_0
-			else:
-				var blend_factor = (height_factor - lower_thresh) / blend_zone
-				color_0 = lerp(lower_0, upper_0, blend_factor)
-			color_0 = get_dominant_color(color_0)
-	else:
-		var ab_color = lerp(source_map_0[cell_coords.y*dimensions.x + cell_coords.x], source_map_0[cell_coords.y*dimensions.x + cell_coords.x + 1], x)
-		var cd_color = lerp(source_map_0[(cell_coords.y + 1)*dimensions.x + cell_coords.x], source_map_0[(cell_coords.y + 1)*dimensions.x + cell_coords.x + 1], x)
-		if terrain_system.blend_mode != 1:
-			color_0 = get_dominant_color(lerp(ab_color, cd_color, z)) # Use this for mixed triangles
-		else:
-			color_0 = source_map_0[cell_coords.y * dimensions.x + cell_coords.x] # Use this for perfect square tiles
+	var is_ridge := floor_mode and terrain_system.use_ridge_texture and (uv.y > 1.0 - terrain_system.ridge_threshold)
+
+	# Get color source maps based on floor/wall/ridge state
+	var sources := _get_color_sources(floor_mode, is_ridge)
+	var source_map_0 : PackedColorArray = sources[0]
+	var source_map_1 : PackedColorArray = sources[1]
+	var use_wall_colors := (source_map_0 == wall_color_map_0)
+
+	# Calculate vertex colors using appropriate interpolation method
+	var lower_0 : Color = cell_wall_lower_color_0 if use_wall_colors else cell_floor_lower_color_0
+	var upper_0 : Color = cell_wall_upper_color_0 if use_wall_colors else cell_floor_upper_color_0
+	var color_0 := _interpolate_vertex_color(x, y, z, source_map_0, diag_midpoint, lower_0, upper_0)
 	st.set_color(color_0)
-	
-	var color_1: Color
-	if new_chunk:
-		color_1 = Color(1.0, 0.0, 0.0, 0.0)
-		source_map_1[cell_coords.y*dimensions.x + cell_coords.x] = Color(1.0, 0.0, 0.0, 0.0)
-	elif diag_midpoint:
-		if terrain_system.blend_mode == 1:
-			# Hard edge - again same... vertex uses same color as cell's top-left corner
-			color_1 = source_map_1[cell_coords.y * dimensions.x + cell_coords.x]
-		else:
-			# Smooth blend mode - keep the blend we had
-			var ad_color = lerp(source_map_1[cell_coords.y*dimensions.x + cell_coords.x], source_map_1[(cell_coords.y + 1)*dimensions.x + cell_coords.x + 1], 0.5)
-			var bc_color = lerp(source_map_1[cell_coords.y*dimensions.x + cell_coords.x + 1], source_map_1[(cell_coords.y + 1)*dimensions.x + cell_coords.x], 0.5)
-			color_1 = Color(min(ad_color.r, bc_color.r), min(ad_color.g, bc_color.g), min(ad_color.b, bc_color.b), min(ad_color.a, bc_color.a))
-			if ad_color.r > 0.99 or bc_color.r > 0.99: color_1.r = 1.0;
-			if ad_color.g > 0.99 or bc_color.g > 0.99: color_1.g = 1.0;
-			if ad_color.b > 0.99 or bc_color.b > 0.99: color_1.b = 1.0;
-			if ad_color.a > 0.99 or bc_color.a > 0.99: color_1.a = 1.0;
-	elif cell_is_boundary:
-		if terrain_system.blend_mode == 1:
-			color_1 = source_map_1[cell_coords.y * dimensions.x + cell_coords.x]
-		else:
-			var height_range = cell_max_height - cell_min_height
-			var height_factor = clamp((y - cell_min_height) / height_range, 0.0, 1.0)
-			
-			var lower_1: Color = cell_wall_lower_color_1 if use_wall_colors else cell_floor_lower_color_1
-			var upper_1: Color = cell_wall_upper_color_1 if use_wall_colors else cell_floor_upper_color_1
-			
-			if height_factor < 0.3:
-				color_1 = lower_1
-			elif height_factor > 0.7:
-				color_1 = upper_1
-			else:
-				var blend_factor = (height_factor - 0.3) / 0.4
-				color_1 = lerp(lower_1, upper_1, blend_factor)
-			color_1 = get_dominant_color(color_1)
-	else:
-		var ab_color = lerp(source_map_1[cell_coords.y*dimensions.x + cell_coords.x], source_map_1[cell_coords.y*dimensions.x + cell_coords.x + 1], x)
-		var cd_color = lerp(source_map_1[(cell_coords.y + 1)*dimensions.x + cell_coords.x], source_map_1[(cell_coords.y + 1)*dimensions.x + cell_coords.x + 1], x)
-		if terrain_system.blend_mode != 1:
-			color_1 = get_dominant_color(lerp(ab_color, cd_color, z)) # Use this for mixed triangles
-		else:
-			color_1 = source_map_1[cell_coords.y * dimensions.x + cell_coords.x] # Use this for perfect square tiles
+
+	var lower_1 : Color = cell_wall_lower_color_1 if use_wall_colors else cell_floor_lower_color_1
+	var upper_1 : Color = cell_wall_upper_color_1 if use_wall_colors else cell_floor_upper_color_1
+	var color_1 := _interpolate_vertex_color(x, y, z, source_map_1, diag_midpoint, lower_1, upper_1)
 	st.set_custom(0, color_1)
-	
-	# is_ridge already calculated above (before color source selection)
+
+	# is_ridge already calculated above
 	var g_mask: Color = grass_mask_map[cell_coords.y*dimensions.x + cell_coords.x]
 	g_mask.g = 1.0 if is_ridge else 0.0
 	st.set_custom(1, g_mask)
