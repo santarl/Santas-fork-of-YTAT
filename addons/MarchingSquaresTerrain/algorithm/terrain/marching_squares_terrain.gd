@@ -3,11 +3,18 @@ extends Node3D
 class_name MarchingSquaresTerrain
 
 
-enum StorageMode { BAKED, RUNTIME }
+enum StorageMode {
+	## Saves load time. Loads a pre-built visual mesh from disk.
+	## The collision mesh, grass etc are generated when the scene loads.
+	## (faster load, slightly larger files).
+	BAKED,
+	## Saves disk space. Generates everything from heightmaps when the scene loads.
+	## This is overkill for most games.
+	## (slower load, smallest files).
+	RUNTIME,
+}
 
 ## The storage mode for terrain data. 
-## BAKED: Saves load time. Loads a pre-built visual mesh from disk. collision mesh, grass etc are generated at runtime. (faster load, larger files).
-## RUNTIME: Saves disk space. Generates the visual & collision mesh, grass etc from heightmaps when the scene loads (slower load, smallest files).
 @export var storage_mode : StorageMode = StorageMode.BAKED:
 	set(value):
 		if storage_mode != value:
